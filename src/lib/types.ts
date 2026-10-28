@@ -28,6 +28,7 @@ export interface Profile {
   show_rates: boolean
   show_calendar: boolean
   open_in_reader: boolean
+  is_admin: boolean
   weather_city: string | null
   weather_lat: number | null
   weather_lon: number | null
@@ -46,6 +47,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   show_rates: true,
   show_calendar: true,
   open_in_reader: false,
+  is_admin: false,
   weather_city: null,
   weather_lat: null,
   weather_lon: null,
@@ -123,4 +125,15 @@ export interface ReaderArticle {
   length: number | null
   url: string
   image_url: string | null
+}
+
+export interface Account {
+  id: string
+  email: string
+  display_name: string | null
+  is_admin: boolean
+  created_at: string
+  last_sign_in_at: string | null
+  invited_at: string | null
+  status: 'active' | 'invited' | 'inactive'
 }

@@ -3,9 +3,9 @@ import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
 import {
   ACCENTS, BACKGROUNDS, CATEGORY_ORDER, FONTS, LAYOUTS, SEARCH_ENGINES, TEXT_SIZES,
-  type Accent, type Category, type DefaultSource, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource,
+  type Accent, type Account, type Category, type DefaultSource, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource,
 } from '../lib/types'
-import { hostname } from '../lib/time'
+import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { faviconFor } from '../components/QuickLinks'
 import { StarIcon, BookIcon } from '../components/Icons'
@@ -14,10 +14,11 @@ type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>)
 
 const ACCENT_HEX: Record<Accent, string> = { blue: '#2563eb', indigo: '#4f46e5', purple: '#7c3aed', pink: '#db2777', red: '#dc2626', orange: '#ea580c', amber: '#d97706', green: '#15803d', teal: '#0d9488', slate: '#475569' }
 
-type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account'
+type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
   { id: 'profile', key: 'settings.profile' }, { id: 'look', key: 'settings.appearance' }, { id: 'front', key: 'settings.frontPage' },
   { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'account', key: 'settings.account' },
+  { id: 'invites', key: 'invites.title' },
 ]
 
 export default function Settings({ t, profile, update, saving, userId, email }: Props) {
@@ -39,7 +40,7 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
   return (
     <div className="settings-layout">
       <nav className="settings-nav" aria-label={t('settings.title')}>
-        {SECTIONS.map((s) => (
+        {SECTIONS.filter((s) => s.id !== 'invites' || profile.is_admin).map((s) => (
           <button key={s.id} type="button" aria-current={active === s.id} onClick={() => jump(s.id)}>{t(s.key)}</button>
         ))}
       </nav>
@@ -128,8 +129,19 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
         </Section>
 
         <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
-          <div><button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button></div>
+          <div className="two-col">
+            <PasswordForm t={t} />
+            <div className="stack" style={{ justifyItems: 'start' }}>
+              <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button>
+            </div>
+          </div>
         </Section>
+
+        {profile.is_admin && (
+          <Section id="invites" ref={reg('invites')} title={t('invites.title')} desc={t('invites.desc')}>
+            <Invites t={t} lang={profile.language} selfId={userId} />
+          </Section>
+        )}
       </div>
     </div>
   )
@@ -441,6 +453,107 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function PasswordForm({ t }: { t: T }) {
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (pw !== pw2) { setMsg({ ok: false, text: t('account.passwordMismatch') }); return }
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password: pw })
+    setBusy(false)
+    if (error) { setMsg({ ok: false, text: error.message }); return }
+    setMsg({ ok: true, text: t('account.passwordSaved') }); setPw(''); setPw2('')
+  }
+
+  return (
+    <form className="stack" onSubmit={submit}>
+      <div>
+        <b>{t('account.setPassword')}</b>
+        <div className="muted" style={{ fontSize: '.92em' }}>{t('account.setPasswordDesc')}</div>
+      </div>
+      <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.newPassword')} value={pw} onChange={(e) => setPw(e.target.value)} />
+      <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.confirmPassword')} value={pw2} onChange={(e) => setPw2(e.target.value)} />
+      {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
+      <div><button className="btn primary" type="submit" disabled={busy || pw.length < 8}>{t('account.save')}</button></div>
+    </form>
+  )
+}
+
+function Invites({ t, lang, selfId }: { t: T; lang: Profile['language']; selfId: string }) {
+  const [accounts, setAccounts] = useState<Account[] | null>(null)
+  const [email, setEmail] = useState('')
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  type Resp = { accounts?: Account[]; error?: string; code?: string | null }
+  async function call(body: Record<string, unknown>): Promise<Resp> {
+    const { data, error } = await supabase.functions.invoke<Resp>('admin', { body })
+    if (error) {
+      // FunctionsHttpError carries the JSON body of a non-2xx response.
+      const ctx = (error as { context?: Response }).context
+      try { return (await ctx?.json()) ?? { error: error.message } } catch { return { error: error.message } }
+    }
+    return data ?? {}
+  }
+
+  useEffect(() => { call({ action: 'list' }).then((r) => setAccounts(r.accounts ?? [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function invite(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true); setMsg(null)
+    const r = await call({ action: 'invite', email: email.trim() })
+    setBusy(false)
+    if (r.error) {
+      const known = r.error === 'invalid_email' ? t('invites.error.invalid_email') : /already|exists|registered/i.test(r.error) ? t('invites.error.exists') : r.error
+      setMsg({ ok: false, text: known }); return
+    }
+    setMsg({ ok: true, text: t('invites.sent') }); setEmail(''); if (r.accounts) setAccounts(r.accounts)
+  }
+
+  async function remove(a: Account) {
+    if (!window.confirm(t('invites.confirmRemove', { email: a.email }))) return
+    const r = await call({ action: 'remove', user_id: a.id })
+    if (r.error) { setMsg({ ok: false, text: r.error }); return }
+    if (r.accounts) setAccounts(r.accounts)
+  }
+
+  return (
+    <div className="two-col">
+      <form className="stack" onSubmit={invite}>
+        <label className="field">
+          <span>{t('invites.email')}</span>
+          <input className="input" type="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
+        <div><button className="btn primary" type="submit" disabled={busy || !email}>{t('invites.send')}</button></div>
+      </form>
+      <div className="stack">
+        <Field label={t('invites.accounts')}>
+          <div className="stack" style={{ gap: 8 }}>
+            {accounts === null && <span className="muted">…</span>}
+            {accounts?.map((a) => (
+              <div className="src-card" key={a.id} data-on={a.status === 'active'}>
+                <div className="grow">
+                  <b>{a.display_name || a.email}</b>
+                  <small>{a.email}{a.last_sign_in_at ? ` · ${t('invites.lastSeen', { time: timeAgo(a.last_sign_in_at, lang, t('time.now')) })}` : ''}</small>
+                </div>
+                <span className="lang-badge">{a.is_admin ? t('invites.admin') : t(`invites.status.${a.status}` as Key)}</span>
+                {!a.is_admin && a.id !== selfId && (
+                  <button type="button" className="icon-btn" aria-label={t('invites.remove')} title={t('invites.remove')} onClick={() => remove(a)}>✕</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Field>
       </div>
     </div>
   )
