@@ -1,98 +1,231 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
-import { ACCENTS, BACKGROUNDS, FONTS, LAYOUTS, SEARCH_ENGINES, TEXT_SIZES, type Accent, type Background, type DefaultSource, type Font, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource } from '../lib/types'
+import {
+  ACCENTS, BACKGROUNDS, CATEGORY_ORDER, FONTS, LAYOUTS, SEARCH_ENGINES, TEXT_SIZES,
+  type Accent, type Category, type DefaultSource, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource,
+} from '../lib/types'
+import { hostname } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { faviconFor } from '../components/QuickLinks'
-import { hostname } from '../lib/time'
+import { StarIcon, BookIcon } from '../components/Icons'
 
-type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string }
+type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string; email: string }
 
 const ACCENT_HEX: Record<Accent, string> = { blue: '#2563eb', indigo: '#4f46e5', purple: '#7c3aed', pink: '#db2777', red: '#dc2626', orange: '#ea580c', amber: '#d97706', green: '#15803d', teal: '#0d9488', slate: '#475569' }
 
-export default function Settings({ t, profile, update, saving, userId }: Props) {
-  const [name, setName] = useState(profile.display_name ?? '')
-  useEffect(() => setName(profile.display_name ?? ''), [profile.display_name])
+type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account'
+const SECTIONS: { id: SectionId; key: Key }[] = [
+  { id: 'profile', key: 'settings.profile' }, { id: 'look', key: 'settings.appearance' }, { id: 'front', key: 'settings.frontPage' },
+  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'account', key: 'settings.account' },
+]
+
+export default function Settings({ t, profile, update, saving, userId, email }: Props) {
+  const [active, setActive] = useState<SectionId>('profile')
+  const refs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
+
+  useEffect(() => {
+    const obs = new IntersectionObserver((entries) => {
+      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+      if (visible) setActive(visible.target.id as SectionId)
+    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 })
+    Object.values(refs.current).forEach((el) => el && obs.observe(el))
+    return () => obs.disconnect()
+  }, [])
+
+  const jump = (id: SectionId) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  const reg = (id: SectionId) => (el: HTMLElement | null) => { refs.current[id] = el }
 
   return (
-    <div className="settings">
-      <h1>{t('settings.title')}</h1>
+    <div className="settings-layout">
+      <nav className="settings-nav" aria-label={t('settings.title')}>
+        {SECTIONS.map((s) => (
+          <button key={s.id} type="button" aria-current={active === s.id} onClick={() => jump(s.id)}>{t(s.key)}</button>
+        ))}
+      </nav>
 
-      <section className="card section" aria-labelledby="s-profile">
-        <h2 id="s-profile">{t('settings.profile')}</h2>
-        <label className="field">
-          <span>{t('settings.name')}</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)}
-            onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
-        </label>
-        <div className="field">
-          <span>{t('settings.language')}</span>
-          <Segmented value={profile.language} options={[['ro', 'Română'], ['en', 'English']]} onChange={(v) => update({ language: v })} />
+      <div className="settings-main">
+        <div className="row">
+          <h1 style={{ margin: 0 }}>{t('settings.title')}</h1>
+          <span className="status" aria-live="polite">{saving ? t('settings.saving') : ''}</span>
         </div>
-      </section>
 
-      <section className="card section" aria-labelledby="s-look">
-        <h2 id="s-look">{t('settings.appearance')}</h2>
-        <div className="field">
-          <span>{t('settings.theme')}</span>
-          <Segmented<Theme> value={profile.theme} options={[['auto', t('theme.auto')], ['light', t('theme.light')], ['dark', t('theme.dark')]]} onChange={(v) => update({ theme: v })} />
-        </div>
-        <div className="field">
-          <span>{t('settings.accent')}</span>
-          <div className="swatches" role="radiogroup" aria-label={t('settings.accent')}>
-            {ACCENTS.map((a) => (
-              <button key={a} type="button" className="swatch" style={{ background: ACCENT_HEX[a] }} aria-pressed={profile.accent === a}
-                aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
-            ))}
+        <Section id="profile" ref={reg('profile')} title={t('settings.profile')} desc={t('settings.profileDesc')}>
+          <ProfileFields t={t} profile={profile} update={update} />
+        </Section>
+
+        <Section id="look" ref={reg('look')} title={t('settings.appearance')} desc={t('settings.appearanceDesc')}>
+          <div className="look-grid">
+            <div className="stack">
+              <Field label={t('settings.theme')}>
+                <Segmented<Theme> value={profile.theme} options={[['auto', t('theme.auto')], ['light', t('theme.light')], ['dark', t('theme.dark')]]} onChange={(v) => update({ theme: v })} />
+              </Field>
+              <Field label={t('settings.accent')}>
+                <div className="swatches" role="radiogroup" aria-label={t('settings.accent')}>
+                  {ACCENTS.map((a) => (
+                    <button key={a} type="button" className="swatch" style={{ background: ACCENT_HEX[a] }} aria-pressed={profile.accent === a}
+                      aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
+                  ))}
+                </div>
+              </Field>
+              <Field label={t('settings.layout')}>
+                <div className="option-cards">
+                  {LAYOUTS.map((l) => (
+                    <button key={l} type="button" className="option-card" aria-pressed={profile.layout === l} onClick={() => update({ layout: l })}>
+                      <LayoutGlyph layout={l} /><span>{t(`layout.${l}` as Key)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={t('settings.font')}>
+                <div className="option-cards">
+                  {FONTS.map((f) => (
+                    <button key={f} type="button" className="option-card" aria-pressed={profile.font === f} data-font={f} onClick={() => update({ font: f })}>
+                      <span className="font-glyph">Aa</span><span>{t(`font.${f}` as Key)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={t('settings.background')}>
+                <div className="option-cards">
+                  {BACKGROUNDS.map((b) => (
+                    <button key={b} type="button" className="option-card" aria-pressed={profile.background === b} onClick={() => update({ background: b })}>
+                      <span className={`bg-glyph bg-${b}`} aria-hidden="true" /><span>{t(`bg.${b}` as Key)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={t('settings.textSize')}>
+                <Segmented<TextSize> value={profile.text_size} options={TEXT_SIZES.map((s) => [s, t(`size.${s}` as Key)] as [TextSize, string])} onChange={(v) => update({ text_size: v })} />
+              </Field>
+            </div>
+            <aside className="look-preview" aria-label={t('settings.preview')}>
+              <small className="muted">{t('settings.preview')}</small>
+              <Preview t={t} layout={profile.layout} />
+            </aside>
           </div>
-        </div>
-        <div className="field">
-          <span>{t('settings.textSize')}</span>
-          <Segmented<TextSize> value={profile.text_size} options={TEXT_SIZES.map((s) => [s, t(`size.${s}` as Key)] as [TextSize, string])} onChange={(v) => update({ text_size: v })} />
-        </div>
-        <div className="field">
-          <span>{t('settings.layout')}</span>
-          <Segmented<Layout> value={profile.layout} options={LAYOUTS.map((l) => [l, t(`layout.${l}` as Key)] as [Layout, string])} onChange={(v) => update({ layout: v })} />
-        </div>
-        <div className="field">
-          <span>{t('settings.font')}</span>
-          <Segmented<Font> value={profile.font} options={FONTS.map((f) => [f, t(`font.${f}` as Key)] as [Font, string])} onChange={(v) => update({ font: v })} />
-        </div>
-        <div className="field">
-          <span>{t('settings.background')}</span>
-          <Segmented<Background> value={profile.background} options={BACKGROUNDS.map((b) => [b, t(`bg.${b}` as Key)] as [Background, string])} onChange={(v) => update({ background: v })} />
-        </div>
-      </section>
+        </Section>
 
-      <section className="card section" aria-labelledby="s-front">
-        <h2 id="s-front">{t('settings.frontPage')}</h2>
-        <Toggle label={t('settings.showRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
-        <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
-        <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
-        <div className="field">
-          <span>{t('settings.searchEngine')}</span>
-          <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
-        </div>
-      </section>
+        <Section id="front" ref={reg('front')} title={t('settings.frontPage')} desc={t('settings.frontPageDesc')}>
+          <Toggle label={t('settings.showRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
+          <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
+          <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
+          <Field label={t('settings.searchEngine')}>
+            <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
+          </Field>
+        </Section>
 
-      <Links t={t} userId={userId} />
-      <Sources t={t} userId={userId} />
-      <Weather t={t} profile={profile} update={update} />
+        <Section id="links" ref={reg('links')} title={t('links.title')} desc={t('settings.linksDesc')}>
+          <Links t={t} userId={userId} />
+        </Section>
 
-      <div className="row">
-        <span className="status">{saving ? t('settings.saving') : ''}</span>
-        <span className="spacer" />
-        <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button>
+        <Section id="sources" ref={reg('sources')} title={t('settings.sources')} desc={t('settings.sourcesLead')}>
+          <Sources t={t} userId={userId} />
+        </Section>
+
+        <Section id="weather" ref={reg('weather')} title={t('settings.weather')} desc={t('settings.weatherDesc')}>
+          <Weather t={t} profile={profile} update={update} />
+        </Section>
+
+        <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
+          <div><button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button></div>
+        </Section>
       </div>
     </div>
   )
 }
 
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+/* ---------- building blocks ---------- */
+
+function Section({ id, title, desc, children, ref }: { id: string; title: string; desc?: string; children: ReactNode; ref: (el: HTMLElement | null) => void }) {
+  return (
+    <section id={id} ref={ref} className="card section" aria-labelledby={`h-${id}`}>
+      <div className="section-head">
+        <h2 id={`h-${id}`}>{title}</h2>
+        {desc && <p className="muted">{desc}</p>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <div className="field"><span>{label}</span>{children}</div>
+}
+
+function Segmented<V extends string>({ value, options, onChange }: { value: V; options: [V, string][]; onChange: (v: V) => void }) {
+  return (
+    <div className="seg">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)}>{label}</button>
+      ))}
+    </div>
+  )
+}
+
+function Toggle({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string }) {
   return (
     <div className="toggle-row">
-      <div className="grow">{label}</div>
+      <div className="grow">{label}{hint && <small>{hint}</small>}</div>
       <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
+    </div>
+  )
+}
+
+function LayoutGlyph({ layout }: { layout: Layout }) {
+  return (
+    <svg className="layout-glyph" viewBox="0 0 48 36" aria-hidden="true">
+      {layout === 'cards' && <>
+        <rect x="2" y="2" width="21" height="14" rx="2" /><rect x="25" y="2" width="21" height="14" rx="2" />
+        <rect x="2" y="20" width="21" height="14" rx="2" /><rect x="25" y="20" width="21" height="14" rx="2" />
+      </>}
+      {layout === 'magazine' && <>
+        <rect x="2" y="2" width="44" height="18" rx="2" />
+        <rect x="2" y="24" width="13" height="10" rx="2" /><rect x="17.5" y="24" width="13" height="10" rx="2" /><rect x="33" y="24" width="13" height="10" rx="2" />
+      </>}
+      {layout === 'list' && <>
+        <rect x="2" y="2" width="9" height="9" rx="2" /><rect x="14" y="4" width="32" height="5" rx="1.5" />
+        <rect x="2" y="14" width="9" height="9" rx="2" /><rect x="14" y="16" width="32" height="5" rx="1.5" />
+        <rect x="2" y="26" width="9" height="9" rx="2" /><rect x="14" y="28" width="32" height="5" rx="1.5" />
+      </>}
+    </svg>
+  )
+}
+
+function Preview({ t, layout }: { t: T; layout: Layout }) {
+  return (
+    <div className={layout === 'list' ? 'list preview' : 'grid preview'}>
+      <article className="card article">
+        {layout !== 'list' && <div className="article-img preview-img" aria-hidden="true" />}
+        <div className="article-body">
+          <div className="article-src"><b>{t('settings.previewSource')}</b><span>·</span><span>{t('time.now')}</span></div>
+          <h3 className="article-title">{t('settings.previewTitle')}</h3>
+          <p className="article-sum">{t('settings.previewSummary')}</p>
+          <div className="article-actions">
+            <span className="icon-btn"><BookIcon /></span>
+            <span className="icon-btn" aria-pressed="true"><StarIcon filled /></span>
+          </div>
+        </div>
+      </article>
+    </div>
+  )
+}
+
+/* ---------- sections ---------- */
+
+function ProfileFields({ t, profile, update }: { t: T; profile: Profile; update: Props['update'] }) {
+  const [name, setName] = useState(profile.display_name ?? '')
+  useEffect(() => setName(profile.display_name ?? ''), [profile.display_name])
+  return (
+    <div className="two-col">
+      <label className="field">
+        <span>{t('settings.name')}</span>
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)}
+          onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
+      </label>
+      <Field label={t('settings.language')}>
+        <Segmented value={profile.language} options={[['ro', 'Română'], ['en', 'English']]} onChange={(v) => update({ language: v })} />
+      </Field>
     </div>
   )
 }
@@ -112,8 +245,7 @@ function Links({ t, userId }: { t: T; userId: string }) {
     e.preventDefault()
     const u = url.trim()
     if (!/^https?:\/\//i.test(u)) { setErr(t('settings.invalidUrl')); return }
-    const name = title.trim() || hostname(u)
-    const error = await add(name, u)
+    const error = await add(title.trim() || hostname(u), u)
     if (error) { setErr(error); return }
     setErr(''); setTitle(''); setUrl('')
   }
@@ -121,52 +253,48 @@ function Links({ t, userId }: { t: T; userId: string }) {
   const suggestions = SUGGESTED_LINKS.filter(([, u]) => !links.some((l) => hostname(l.url) === hostname(u)))
 
   return (
-    <section className="card section" aria-labelledby="s-links">
-      <h2 id="s-links">{t('links.title')}</h2>
-      {links.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('links.empty')}</p>}
-      <div>
-        {links.map((l, i) => (
-          <div className="toggle-row" key={l.id}>
-            <img src={faviconFor(l.url)} alt="" width={24} height={24} style={{ borderRadius: 6 }} />
-            <div className="grow">{l.title}<small>{l.url}</small></div>
-            <button type="button" className="icon-btn" aria-label="↑" disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
-            <button type="button" className="icon-btn" aria-label="↓" disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
-            <button type="button" className="btn ghost" onClick={() => remove(l.id)}>{t('settings.remove')}</button>
-          </div>
-        ))}
-      </div>
-      {suggestions.length > 0 && (
-        <div className="field">
-          <span>{t('links.suggest')}</span>
-          <div className="seg">
-            {suggestions.map(([n, u]) => <button key={u} type="button" onClick={() => add(n, u)}>+ {n}</button>)}
-          </div>
+    <div className="two-col">
+      <div className="stack">
+        {links.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('links.empty')}</p>}
+        <div className="src-grid">
+          {links.map((l, i) => (
+            <div className="src-card" key={l.id} data-on="true">
+              <img className="src-icon" src={faviconFor(l.url)} alt="" width={28} height={28} />
+              <div className="grow"><b>{l.title}</b><small>{hostname(l.url)}</small></div>
+              <button type="button" className="icon-btn" aria-label="↑" disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
+              <button type="button" className="icon-btn" aria-label="↓" disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
+              <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(l.id)}>✕</button>
+            </div>
+          ))}
         </div>
-      )}
-      <form className="field" onSubmit={submit}>
-        <span>{t('links.add')}</span>
-        <input className="input" type="url" inputMode="url" placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-        <input className="input" placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
-        {err && <div className="msg error">{err}</div>}
-        <div><button className="btn primary" type="submit">{t('settings.add')}</button></div>
-      </form>
-    </section>
-  )
-}
-
-function Segmented<V extends string>({ value, options, onChange }: { value: V; options: [V, string][]; onChange: (v: V) => void }) {
-  return (
-    <div className="seg">
-      {options.map(([v, label]) => (
-        <button key={v} type="button" aria-pressed={value === v} onClick={() => onChange(v)}>{label}</button>
-      ))}
+      </div>
+      <div className="stack">
+        {suggestions.length > 0 && (
+          <Field label={t('links.suggest')}>
+            <div className="seg">
+              {suggestions.map(([n, u]) => <button key={u} type="button" onClick={() => add(n, u)}>+ {n}</button>)}
+            </div>
+          </Field>
+        )}
+        <form className="field" onSubmit={submit}>
+          <span>{t('links.add')}</span>
+          <input className="input" type="url" inputMode="url" placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <input className="input" placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
+          {err && <div className="msg error">{err}</div>}
+          <div><button className="btn primary" type="submit">{t('settings.add')}</button></div>
+        </form>
+      </div>
     </div>
   )
 }
 
+type LangFilter = 'all' | 'ro' | 'en'
+
 function Sources({ t, userId }: { t: T; userId: string }) {
   const [defaults, setDefaults] = useState<DefaultSource[]>([])
   const [mine, setMine] = useState<UserSource[]>([])
+  const [section, setSection] = useState<Category | 'all'>('all')
+  const [lang, setLang] = useState<LangFilter>('all')
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [err, setErr] = useState('')
@@ -177,6 +305,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
   }, [userId])
 
   const isOn = (d: DefaultSource) => mine.find((m) => m.default_source_id === d.id)?.enabled ?? d.enabled_by_default
+  const invalidate = () => sessionStorage.removeItem('homepage.feed')
 
   async function toggleDefault(d: DefaultSource) {
     const next = !isOn(d)
@@ -188,7 +317,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
       const { data } = await supabase.from('user_sources').insert({ user_id: userId, default_source_id: d.id, enabled: next }).select().single()
       if (data) setMine((s) => [...s, data as UserSource])
     }
-    sessionStorage.removeItem('homepage.feed')
+    invalidate()
   }
 
   async function addCustom(e: FormEvent) {
@@ -198,58 +327,78 @@ function Sources({ t, userId }: { t: T; userId: string }) {
     setErr('')
     const { data, error } = await supabase.from('user_sources').insert({ user_id: userId, url: u, name: name.trim() || null, enabled: true }).select().single()
     if (error) { setErr(error.message); return }
-    setMine((s) => [...s, data as UserSource]); setUrl(''); setName('')
-    sessionStorage.removeItem('homepage.feed')
+    setMine((s) => [...s, data as UserSource]); setUrl(''); setName(''); invalidate()
   }
 
   async function toggleCustom(m: UserSource) {
     setMine((s) => s.map((x) => (x.id === m.id ? { ...x, enabled: !m.enabled } : x)))
     await supabase.from('user_sources').update({ enabled: !m.enabled }).eq('id', m.id)
-    sessionStorage.removeItem('homepage.feed')
+    invalidate()
   }
 
   async function remove(m: UserSource) {
     setMine((s) => s.filter((x) => x.id !== m.id))
     await supabase.from('user_sources').delete().eq('id', m.id)
-    sessionStorage.removeItem('homepage.feed')
+    invalidate()
   }
 
   const custom = mine.filter((m) => !m.default_source_id)
-  const categories = Array.from(new Set(defaults.map((d) => d.category)))
+  const sections = useMemo(() => CATEGORY_ORDER.filter((c) => c === 'custom' ? custom.length > 0 : defaults.some((d) => d.category === c)), [defaults, custom.length])
+  const shown = defaults.filter((d) => (section === 'all' || d.category === section) && (lang === 'all' || d.language === lang))
+  const showCustom = (section === 'all' || section === 'custom') && custom.length > 0
+  const activeCount = defaults.filter(isOn).length + custom.filter((m) => m.enabled).length
 
   return (
-    <section className="card section" aria-labelledby="s-sources">
-      <h2 id="s-sources">{t('settings.sources')}</h2>
-      <p className="muted" style={{ margin: 0 }}>{t('settings.sourcesLead')}</p>
-      {categories.map((c) => (
-        <div key={c}>
-          <div className="field"><span>{t(`category.${c}` as Key)}</span></div>
-          {defaults.filter((d) => d.category === c).map((d) => (
-            <div className="toggle-row" key={d.id}>
-              <div className="grow">{d.name}<small>{hostname(d.url)}</small></div>
-              <button type="button" role="switch" className="switch" aria-checked={isOn(d)} aria-label={d.name} onClick={() => toggleDefault(d)} />
-            </div>
+    <div className="stack">
+      <div className="filter-row">
+        <div className="chips" role="group" aria-label={t('settings.sources')}>
+          <button type="button" className="chip" aria-pressed={section === 'all'} onClick={() => setSection('all')}>{t('feed.all')}</button>
+          {sections.map((c) => (
+            <button key={c} type="button" className="chip" aria-pressed={section === c} onClick={() => setSection(c)}>{t(`category.${c}` as Key)}</button>
           ))}
         </div>
-      ))}
-      <div>
-        <div className="field"><span>{t('settings.customSources')}</span></div>
-        {custom.map((m) => (
-          <div className="toggle-row" key={m.id}>
-            <div className="grow">{m.name || hostname(m.url!)}<small>{m.url}</small></div>
-            <button type="button" className="btn ghost" onClick={() => remove(m)}>{t('settings.remove')}</button>
+        <div className="seg seg-small" role="group" aria-label={t('lang.all')}>
+          {(['all', 'ro', 'en'] as LangFilter[]).map((l) => (
+            <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)}>{l === 'all' ? t('lang.all') : l.toUpperCase()}</button>
+          ))}
+        </div>
+        <span className="muted" style={{ marginLeft: 'auto' }}>{t('settings.activeSources', { n: activeCount })}</span>
+      </div>
+
+      {shown.length === 0 && !showCustom && <p className="muted" style={{ margin: 0 }}>{t('settings.noSources')}</p>}
+
+      <div className="src-grid">
+        {shown.map((d) => (
+          <div className="src-card" key={d.id} data-on={isOn(d)}>
+            <img className="src-icon" src={faviconFor(d.site_url ?? d.url)} alt="" width={28} height={28} loading="lazy" />
+            <div className="grow">
+              <b>{d.name}</b>
+              <small>{hostname(d.site_url ?? d.url)} · {t(`category.${d.category}` as Key)}</small>
+            </div>
+            <span className={`lang-badge lang-${d.language}`}>{d.language.toUpperCase()}</span>
+            <button type="button" role="switch" className="switch" aria-checked={isOn(d)} aria-label={d.name} onClick={() => toggleDefault(d)} />
+          </div>
+        ))}
+        {showCustom && custom.map((m) => (
+          <div className="src-card" key={m.id} data-on={m.enabled}>
+            <img className="src-icon" src={faviconFor(m.url!)} alt="" width={28} height={28} loading="lazy" />
+            <div className="grow"><b>{m.name || hostname(m.url!)}</b><small>{m.url}</small></div>
+            <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(m)}>✕</button>
             <button type="button" role="switch" className="switch" aria-checked={m.enabled} aria-label={m.name || m.url!} onClick={() => toggleCustom(m)} />
           </div>
         ))}
-        <form className="field" onSubmit={addCustom} style={{ marginTop: 10 }}>
-          <span>{t('settings.addSource')}</span>
-          <input className="input" type="url" inputMode="url" placeholder={t('settings.sourceUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-          <input className="input" placeholder={t('settings.sourceName')} value={name} onChange={(e) => setName(e.target.value)} />
-          {err && <div className="msg error">{err}</div>}
-          <div><button className="btn primary" type="submit">{t('settings.add')}</button></div>
-        </form>
       </div>
-    </section>
+
+      <form className="field add-source" onSubmit={addCustom}>
+        <span>{t('settings.addSource')}</span>
+        <div className="row">
+          <input className="input" style={{ flex: '2 1 240px' }} type="url" inputMode="url" placeholder={t('settings.sourceUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <input className="input" style={{ flex: '1 1 160px' }} placeholder={t('settings.sourceName')} value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="btn primary" type="submit">{t('settings.add')}</button>
+        </div>
+        {err && <div className="msg error">{err}</div>}
+      </form>
+    </div>
   )
 }
 
@@ -267,29 +416,32 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
   }
 
   return (
-    <section className="card section" aria-labelledby="s-weather">
-      <h2 id="s-weather">{t('settings.weather')}</h2>
-      <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>
-      {profile.weather_city && (
-        <div className="row">
-          <span>📍 {profile.weather_city}</span>
-          <button type="button" className="btn ghost" onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>{t('settings.weatherClear')}</button>
-        </div>
-      )}
-      <form className="row" onSubmit={search}>
-        <input className="input" style={{ flex: 1 }} placeholder={t('settings.weatherCity')} value={q} onChange={(e) => setQ(e.target.value)} required />
-        <button className="btn" type="submit">{t('settings.weatherSearch')}</button>
-      </form>
-      {results && results.length === 0 && <p className="muted">{t('settings.weatherNone')}</p>}
-      {results && results.length > 0 && (
-        <div className="results">
-          {results.map((r) => (
-            <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
-              {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
+    <div className="two-col">
+      <div className="stack">
+        {profile.weather_city ? (
+          <div className="src-card" data-on="true">
+            <span className="src-icon" aria-hidden="true">📍</span>
+            <div className="grow"><b>{profile.weather_city}</b><small>{profile.weather_lat?.toFixed(2)}, {profile.weather_lon?.toFixed(2)}</small></div>
+            <button type="button" className="btn ghost" onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>{t('settings.weatherClear')}</button>
+          </div>
+        ) : <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>}
+      </div>
+      <div className="stack">
+        <form className="row" onSubmit={search}>
+          <input className="input" style={{ flex: 1 }} placeholder={t('settings.weatherCity')} value={q} onChange={(e) => setQ(e.target.value)} required />
+          <button className="btn" type="submit">{t('settings.weatherSearch')}</button>
+        </form>
+        {results && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
+        {results && results.length > 0 && (
+          <div className="results">
+            {results.map((r) => (
+              <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
+                {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

@@ -31,7 +31,7 @@ export default function App() {
         <div className="container">
           {route.name === 'feed' && <Feed t={t} profile={effective} userId={uid} />}
           {route.name === 'saved' && <Saved t={t} profile={effective} userId={uid} />}
-          {route.name === 'settings' && <Settings t={t} profile={effective} update={update} saving={saving} userId={uid} />}
+          {route.name === 'settings' && <Settings t={t} profile={effective} update={update} saving={saving} userId={uid} email={session.user.email ?? ''} />}
           {route.name === 'read' && route.param && <Reader t={t} itemId={route.param} userId={uid} />}
         </div>
       </main>
