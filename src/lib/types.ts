@@ -1,10 +1,15 @@
 export type Language = 'ro' | 'en'
 export type Theme = 'light' | 'dark' | 'auto'
 export type TextSize = 'small' | 'normal' | 'large' | 'xlarge'
-export type Layout = 'list' | 'cards'
-export type Accent = 'blue' | 'green' | 'orange' | 'purple' | 'red' | 'teal'
+export type Layout = 'list' | 'cards' | 'magazine'
+export type Font = 'system' | 'serif' | 'rounded'
+export type Background = 'flat' | 'tinted' | 'paper'
+export type Accent = 'blue' | 'indigo' | 'purple' | 'pink' | 'red' | 'orange' | 'amber' | 'green' | 'teal' | 'slate'
 
-export const ACCENTS: Accent[] = ['blue', 'green', 'orange', 'purple', 'red', 'teal']
+export const ACCENTS: Accent[] = ['blue', 'indigo', 'purple', 'pink', 'red', 'orange', 'amber', 'green', 'teal', 'slate']
+export const LAYOUTS: Layout[] = ['cards', 'magazine', 'list']
+export const FONTS: Font[] = ['system', 'serif', 'rounded']
+export const BACKGROUNDS: Background[] = ['flat', 'tinted', 'paper']
 export const TEXT_SIZES: TextSize[] = ['small', 'normal', 'large', 'xlarge']
 
 export interface Profile {
@@ -15,6 +20,8 @@ export interface Profile {
   accent: Accent
   text_size: TextSize
   layout: Layout
+  font: Font
+  background: Background
   weather_city: string | null
   weather_lat: number | null
   weather_lon: number | null
@@ -27,6 +34,8 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   accent: 'blue',
   text_size: 'normal',
   layout: 'cards',
+  font: 'system',
+  background: 'flat',
   weather_city: null,
   weather_lat: null,
   weather_lon: null,

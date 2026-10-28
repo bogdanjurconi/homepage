@@ -51,6 +51,8 @@ export function useProfile(userId: string | undefined) {
       root.dataset.theme = p.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : p.theme
       root.dataset.accent = p.accent
       root.dataset.size = p.text_size
+      root.dataset.font = p.font
+      root.dataset.bg = p.background
       root.lang = p.language
     }
     apply()

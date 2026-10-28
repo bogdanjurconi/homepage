@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
-import { ACCENTS, TEXT_SIZES, type Accent, type DefaultSource, type Layout, type Profile, type TextSize, type Theme, type UserSource } from '../lib/types'
+import { ACCENTS, BACKGROUNDS, FONTS, LAYOUTS, TEXT_SIZES, type Accent, type Background, type DefaultSource, type Font, type Layout, type Profile, type TextSize, type Theme, type UserSource } from '../lib/types'
 import { hostname } from '../lib/time'
 
 type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string }
 
-const ACCENT_HEX: Record<Accent, string> = { blue: '#2563eb', green: '#15803d', orange: '#ea580c', purple: '#7c3aed', red: '#dc2626', teal: '#0d9488' }
+const ACCENT_HEX: Record<Accent, string> = { blue: '#2563eb', indigo: '#4f46e5', purple: '#7c3aed', pink: '#db2777', red: '#dc2626', orange: '#ea580c', amber: '#d97706', green: '#15803d', teal: '#0d9488', slate: '#475569' }
 
 export default function Settings({ t, profile, update, saving, userId }: Props) {
   const [name, setName] = useState(profile.display_name ?? '')
@@ -50,7 +50,15 @@ export default function Settings({ t, profile, update, saving, userId }: Props) 
         </div>
         <div className="field">
           <span>{t('settings.layout')}</span>
-          <Segmented<Layout> value={profile.layout} options={[['cards', t('layout.cards')], ['list', t('layout.list')]]} onChange={(v) => update({ layout: v })} />
+          <Segmented<Layout> value={profile.layout} options={LAYOUTS.map((l) => [l, t(`layout.${l}` as Key)] as [Layout, string])} onChange={(v) => update({ layout: v })} />
+        </div>
+        <div className="field">
+          <span>{t('settings.font')}</span>
+          <Segmented<Font> value={profile.font} options={FONTS.map((f) => [f, t(`font.${f}` as Key)] as [Font, string])} onChange={(v) => update({ font: v })} />
+        </div>
+        <div className="field">
+          <span>{t('settings.background')}</span>
+          <Segmented<Background> value={profile.background} options={BACKGROUNDS.map((b) => [b, t(`bg.${b}` as Key)] as [Background, string])} onChange={(v) => update({ background: v })} />
         </div>
       </section>
 

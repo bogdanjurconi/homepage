@@ -31,7 +31,7 @@ export default function Saved({ t, profile, userId }: { t: T; profile: Profile; 
       <div className={profile.layout === 'list' ? 'list' : 'grid'}>
         {items.map((item) => (
           <ArticleCard key={item.id} item={item} sourceName={hostname(item.link)} lang={profile.language} t={t}
-            saved onToggleSave={unsave} showImage={profile.layout === 'cards'} />
+            saved onToggleSave={unsave} showImage={profile.layout !== 'list'} />
         ))}
       </div>
     </>

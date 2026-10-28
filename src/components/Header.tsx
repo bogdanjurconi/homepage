@@ -23,7 +23,7 @@ function Nav({ t, route, go, className }: Props & { className?: string }) {
 }
 
 export default function Header(props: Props) {
-  const { t, go, name } = props
+  const { t, go } = props
   return (
     <header className="header">
       <div className="container">
@@ -31,7 +31,6 @@ export default function Header(props: Props) {
           <span className="brand-mark"><HomeIcon /></span>
           {t('appName')}
         </a>
-        {name && <span className="greeting">· {name}</span>}
         <span className="spacer" />
         <Nav {...props} />
       </div>

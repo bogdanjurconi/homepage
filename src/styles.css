@@ -172,3 +172,42 @@ h2 { font-size: 1.2em; margin: 0 0 12px; }
 .results button { text-align: left; min-height: var(--tap); padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
 .results button:hover { background: var(--hover); }
 .status { font-size: .9em; color: var(--muted); min-height: 1.4em; }
+
+/* ---------- design options (migration 0002) ---------- */
+:root[data-accent="indigo"] { --accent: #4f46e5; --accent-fg: #fff; --accent-soft: rgb(79 70 229 / .14); }
+:root[data-accent="pink"]   { --accent: #db2777; --accent-fg: #fff; --accent-soft: rgb(219 39 119 / .14); }
+:root[data-accent="amber"]  { --accent: #b45309; --accent-fg: #fff; --accent-soft: rgb(217 119 6 / .16); }
+:root[data-accent="slate"]  { --accent: #475569; --accent-fg: #fff; --accent-soft: rgb(71 85 105 / .14); }
+:root[data-theme="dark"][data-accent="indigo"] { --accent: #818cf8; --accent-fg: #0c0a2a; }
+:root[data-theme="dark"][data-accent="pink"]   { --accent: #f472b6; --accent-fg: #26061a; }
+:root[data-theme="dark"][data-accent="amber"]  { --accent: #fbbf24; --accent-fg: #221600; }
+:root[data-theme="dark"][data-accent="slate"]  { --accent: #94a3b8; --accent-fg: #0f1115; }
+
+:root[data-font="serif"]   { --font: "Source Serif 4 Variable", "Iowan Old Style", Charter, Georgia, "Noto Serif", serif; }
+:root[data-font="rounded"] { --font: "Nunito Variable", ui-rounded, "SF Pro Rounded", system-ui, sans-serif; }
+:root[data-font="serif"] .article-title { letter-spacing: -0.01em; }
+
+:root[data-bg="paper"] { --bg: #f4eee4; --card: #fffbf4; --line: #e6dccb; --chip: #ece3d4; --hover: #f3ecdf; }
+:root[data-theme="dark"][data-bg="paper"] { --bg: #16130e; --card: #211d15; --line: #322c21; --chip: #2b261c; --hover: #2a251b; }
+:root[data-bg="tinted"] body { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)) 0, var(--bg) 480px) fixed; }
+:root[data-bg="tinted"] .header { background: transparent; border-bottom-color: transparent; backdrop-filter: blur(12px); }
+
+/* greeting strip */
+.hero { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin: 6px 0 18px; }
+.hero-text { flex: 1 1 260px; display: flex; flex-direction: column; justify-content: center; }
+.hero h1 { font-size: 1.9em; line-height: 1.15; margin: 0; letter-spacing: -0.015em; }
+.hero .date { color: var(--muted); margin-top: 4px; }
+.hero .date::first-letter { text-transform: uppercase; }
+.hero .weather { flex: 1 1 320px; }
+
+/* magazine layout: first story large */
+.magazine { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.magazine .article.lead { grid-column: 1 / -1; }
+.magazine .article.lead .article-title { font-size: 1.45em; }
+.magazine .article.lead .article-sum { -webkit-line-clamp: 4; font-size: 1em; }
+@media (min-width: 720px) {
+  .magazine .article.lead { flex-direction: row; }
+  .magazine .article.lead .article-img { width: 56%; aspect-ratio: 16 / 10; }
+  .magazine .article.lead .article-body { padding: 22px 26px; justify-content: center; }
+  .magazine .article.lead .article-title { font-size: 1.8em; }
+}

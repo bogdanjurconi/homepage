@@ -12,12 +12,13 @@ type Props = {
   saved: boolean
   onToggleSave: (item: FeedItem) => void
   showImage: boolean
+  className?: string
 }
 
-export default function ArticleCard({ item, sourceName, lang, t, saved, onToggleSave, showImage }: Props) {
+export default function ArticleCard({ item, sourceName, lang, t, saved, onToggleSave, showImage, className }: Props) {
   const [imgOk, setImgOk] = useState(true)
   return (
-    <article className="card article">
+    <article className={`card article ${className ?? ''}`}>
       {showImage && item.image_url && imgOk && (
         <img className="article-img" src={item.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
       )}

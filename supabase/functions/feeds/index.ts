@@ -95,8 +95,9 @@ async function refreshFeed(admin: SupabaseClient, url: string) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const xml = await res.text();
     const feed = await parseFeed(xml);
+    const raw = rawDescriptions(xml);
     const rows = feed.entries.slice(0, MAX_ITEMS_PER_FEED)
-      .map((e) => toRow(url, e as Record<string, unknown>, fetchedAt))
+      .map((e) => toRow(url, e as Record<string, unknown>, fetchedAt, raw))
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
     await admin.from("feeds").upsert({ url, title: feed.title?.value ?? null, last_fetched_at: fetchedAt, last_status: status, last_error: null });
@@ -115,12 +116,16 @@ async function refreshFeed(admin: SupabaseClient, url: string) {
 }
 
 // deno-lint-ignore no-explicit-any
-function toRow(feedUrl: string, e: any, fetchedAt: string) {
+function toRow(feedUrl: string, e: any, fetchedAt: string, raw: Map<string, string>) {
   const link: string | undefined = e.links?.[0]?.href ?? e.links?.[0]?.url ?? e.id;
   const title: string | undefined = e.title?.value?.trim();
   if (!link || !title) return null;
-  const html: string = e.description?.value ?? e.content?.value ?? "";
-  const summary = stripHtml(html).slice(0, 300) || null;
+  let rawHtml: string = e.description?.value ?? e.content?.value ?? "";
+  // Some feeds (GSMArena) mix entity-encoded HTML and CDATA in one <description>, which the parser
+  // reduces to a fragment. Fall back to the description text taken straight from the XML.
+  if (stripHtml(rawHtml).replace(/\]\]>/g, "").trim().length < 20) rawHtml = raw.get(link) ?? raw.get(String(e.id ?? "")) ?? rawHtml;
+  const html = /&lt;(img|p|a|br)\b/i.test(rawHtml) ? decodeEntities(rawHtml) : rawHtml;
+  const summary = stripHtml(html).replace(/\[#[^\]]*#\]/g, "").replace(/\s+/g, " ").trim().slice(0, 300) || null;
   const published = toIso(e.published) ?? toIso(e.updated);
   return {
     feed_url: feedUrl,
@@ -147,7 +152,34 @@ function findImage(e: any, html: string): string | null {
   const att = e.attachments?.find((a: { url?: string; mimeType?: string }) => a.url && (a.mimeType?.startsWith("image/") ?? true));
   if (att?.url) return att.url;
   const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return m?.[1] ?? null;
+  return m?.[1] ? upscaleKnownThumbnail(m[1]) : null;
+}
+
+// GSMArena's RSS only carries a 184x111 thumbnail; the same path exists at a larger size.
+function upscaleKnownThumbnail(url: string): string {
+  if (/fdn\.gsmarena\.com\/.*\/-184x111\//.test(url)) return url.replace("/-184x111/", "/-728x314/");
+  return url;
+}
+
+// link (or guid) -> raw inner text of <description>, CDATA unwrapped, for every <item>/<entry> in the XML.
+function rawDescriptions(xml: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const itemRe = /<(item|entry)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+  for (const m of xml.matchAll(itemRe)) {
+    const body = m[2];
+    const desc = body.match(/<(description|summary|content(?::encoded)?)\b[^>]*>([\s\S]*?)<\/\1>/i)?.[2];
+    if (!desc) continue;
+    const text = desc.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/\]\]>/g, "").trim();
+    const link = body.match(/<link\b[^>]*>([^<]+)<\/link>/i)?.[1]?.trim() ?? body.match(/<link\b[^>]*href=["']([^"']+)["']/i)?.[1];
+    const guid = body.match(/<(guid|id)\b[^>]*>([^<]+)<\/\1>/i)?.[2]?.trim();
+    if (link) out.set(link, text);
+    if (guid) out.set(guid, text);
+  }
+  return out;
+}
+
+function decodeEntities(s: string): string {
+  return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, "&");
 }
 
 function toIso(v: unknown): string | null {
