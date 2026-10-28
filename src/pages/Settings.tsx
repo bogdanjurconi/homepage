@@ -79,6 +79,7 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
                   ))}
                 </div>
               </Field>
+              <Toggle label={t('settings.showSummary')} on={profile.show_summary} onChange={(v) => update({ show_summary: v })} />
               <Field label={t('settings.font')}>
                 <div className="option-cards">
                   {FONTS.map((f) => (
@@ -103,7 +104,7 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
             </div>
             <aside className="look-preview" aria-label={t('settings.preview')}>
               <small className="muted">{t('settings.preview')}</small>
-              <Preview t={t} layout={profile.layout} />
+              <Preview t={t} layout={profile.layout} showSummary={profile.show_summary} />
             </aside>
           </div>
         </Section>
@@ -220,18 +221,20 @@ function LayoutGlyph({ layout }: { layout: Layout }) {
   )
 }
 
-function Preview({ t, layout }: { t: T; layout: Layout }) {
+function Preview({ t, layout, showSummary }: { t: T; layout: Layout; showSummary: boolean }) {
   return (
     <div className={layout === 'list' ? 'list preview' : 'grid preview'}>
       <article className="card article">
         {layout !== 'list' && <div className="article-img preview-img" aria-hidden="true" />}
         <div className="article-body">
-          <div className="article-src"><b>{t('settings.previewSource')}</b><span>·</span><span>{t('time.now')}</span></div>
           <h3 className="article-title">{t('settings.previewTitle')}</h3>
-          <p className="article-sum">{t('settings.previewSummary')}</p>
-          <div className="article-actions">
-            <span className="icon-btn"><BookIcon /></span>
-            <span className="icon-btn" aria-pressed="true"><StarIcon filled /></span>
+          {showSummary && <p className="article-sum">{t('settings.previewSummary')}</p>}
+          <div className="article-foot">
+            <div className="article-src"><b>{t('settings.previewSource')}</b><span>·</span><span>{t('time.now')}</span></div>
+            <div className="article-actions">
+              <span className="icon-btn"><BookIcon /></span>
+              <span className="icon-btn" aria-pressed="true"><StarIcon filled /></span>
+            </div>
           </div>
         </div>
       </article>

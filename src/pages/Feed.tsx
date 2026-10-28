@@ -126,7 +126,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       <div className={layoutClass}>
         {items.map((item, i) => (
           <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t}
-            saved={savedIds.has(item.id)} onToggleSave={toggle} showImage={profile.layout !== 'list'} openInReader={profile.open_in_reader}
+            saved={savedIds.has(item.id)} onToggleSave={toggle} showImage={profile.layout !== 'list'} openInReader={profile.open_in_reader} showSummary={profile.show_summary}
             className={profile.layout === 'magazine' && i === 0 && !!item.image_url ? 'lead' : undefined} />
         ))}
       </div>

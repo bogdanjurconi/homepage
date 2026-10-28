@@ -30,6 +30,7 @@ export interface Profile {
   open_in_reader: boolean
   is_admin: boolean
   has_password: boolean
+  show_summary: boolean
   rate_currencies: string[]
   weather_city: string | null
   weather_lat: number | null
@@ -51,6 +52,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   open_in_reader: false,
   is_admin: false,
   has_password: false,
+  show_summary: false,
   rate_currencies: ['EUR', 'USD', 'GBP'],
   weather_city: null,
   weather_lat: null,
