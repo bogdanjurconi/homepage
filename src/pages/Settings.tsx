@@ -13,7 +13,7 @@ import { StarIcon, BookIcon } from '../components/Icons'
 
 type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string; email: string }
 
-const ACCENT_HEX: Record<Accent, string> = { blue: '#2563eb', indigo: '#4f46e5', purple: '#7c3aed', pink: '#db2777', red: '#dc2626', orange: '#ea580c', amber: '#d97706', green: '#15803d', teal: '#0d9488', slate: '#475569' }
+const ACCENT_HEX: Record<Accent, string> = { blue: '#2f6bea', teal: '#0e8577', green: '#2f8f5b', amber: '#b9740f', coral: '#d9553d', violet: '#7557d6' }
 
 type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
@@ -146,7 +146,7 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
 
         <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
           <div className="two-col">
-            <PasswordForm t={t} />
+            <PasswordForm t={t} email={email} hasPassword={profile.has_password} onSet={() => update({ has_password: true })} />
             <div className="stack" style={{ justifyItems: 'start' }}>
               <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button>
             </div>
@@ -252,7 +252,7 @@ function ProfileFields({ t, profile, update }: { t: T; profile: Profile; update:
           onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
       </label>
       <Field label={t('settings.language')}>
-        <Segmented value={profile.language} options={[['ro', 'Română'], ['en', 'English']]} onChange={(v) => update({ language: v })} />
+        <Segmented value={profile.language} options={[['en', 'English'], ['ro', 'Română']]} onChange={(v) => update({ language: v })} />
       </Field>
     </div>
   )
@@ -474,7 +474,8 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
   )
 }
 
-function PasswordForm({ t }: { t: T }) {
+function PasswordForm({ t, email, hasPassword, onSet }: { t: T; email: string; hasPassword: boolean; onSet: () => void }) {
+  const [current, setCurrent] = useState('')
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -483,23 +484,32 @@ function PasswordForm({ t }: { t: T }) {
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (pw !== pw2) { setMsg({ ok: false, text: t('account.passwordMismatch') }); return }
-    setBusy(true)
+    setBusy(true); setMsg(null)
+    if (hasPassword) {
+      // Re-authenticate with the current password before changing it.
+      const { error } = await supabase.auth.signInWithPassword({ email, password: current })
+      if (error) { setBusy(false); setMsg({ ok: false, text: t('account.wrongCurrent') }); return }
+    }
     const { error } = await supabase.auth.updateUser({ password: pw })
     setBusy(false)
     if (error) { setMsg({ ok: false, text: error.message }); return }
-    setMsg({ ok: true, text: t('account.passwordSaved') }); setPw(''); setPw2('')
+    setMsg({ ok: true, text: t('account.passwordSaved') }); setCurrent(''); setPw(''); setPw2('')
+    if (!hasPassword) onSet()
   }
 
   return (
     <form className="stack" onSubmit={submit}>
       <div>
-        <b>{t('account.setPassword')}</b>
-        <div className="muted" style={{ fontSize: '.92em' }}>{t('account.setPasswordDesc')}</div>
+        <b>{hasPassword ? t('account.changePassword') : t('account.setPassword')}</b>
+        <div className="muted" style={{ fontSize: '.92em' }}>{hasPassword ? t('account.hasPassword') : t('account.setPasswordDesc')}</div>
       </div>
+      {hasPassword && (
+        <input className="input" type="password" autoComplete="current-password" required placeholder={t('account.currentPassword')} value={current} onChange={(e) => setCurrent(e.target.value)} />
+      )}
       <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.newPassword')} value={pw} onChange={(e) => setPw(e.target.value)} />
       <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.confirmPassword')} value={pw2} onChange={(e) => setPw2(e.target.value)} />
       {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
-      <div><button className="btn primary" type="submit" disabled={busy || pw.length < 8}>{t('account.save')}</button></div>
+      <div><button className="btn primary" type="submit" disabled={busy || pw.length < 8 || (hasPassword && !current)}>{t('account.save')}</button></div>
     </form>
   )
 }

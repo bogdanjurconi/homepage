@@ -4,9 +4,8 @@ import type { SearchEngine } from '../lib/types'
 import { SearchIcon } from './Icons'
 
 const ENGINES: Record<SearchEngine, string> = {
-  duckduckgo: 'https://duckduckgo.com/?q=',
-  brave: 'https://search.brave.com/search?q=',
   google: 'https://www.google.com/search?q=',
+  brave: 'https://search.brave.com/search?q=',
 }
 
 export default function SearchBar({ engine, t }: { engine: SearchEngine; t: T }) {

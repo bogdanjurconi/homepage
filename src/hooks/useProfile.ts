@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_PROFILE, type Profile } from '../lib/types'
+import { takePendingLanguage } from '../lib/guestLanguage'
 
 const CACHE_KEY = 'homepage.profile'
 
@@ -22,8 +23,14 @@ export function useProfile(userId: string | undefined) {
     let cancelled = false
     supabase.from('profiles').select('*').eq('id', userId).maybeSingle().then(async ({ data }) => {
       if (cancelled) return
-      if (data) { setProfile(data as Profile); localStorage.setItem(CACHE_KEY, JSON.stringify(data)); return }
-      const fresh: Profile = { id: userId, ...DEFAULT_PROFILE }
+      const pending = takePendingLanguage()
+      if (data) {
+        const loaded = { ...(data as Profile), ...(pending ? { language: pending } : {}) }
+        setProfile(loaded); localStorage.setItem(CACHE_KEY, JSON.stringify(loaded))
+        if (pending && pending !== (data as Profile).language) await supabase.from('profiles').update({ language: pending }).eq('id', userId)
+        return
+      }
+      const fresh: Profile = { id: userId, ...DEFAULT_PROFILE, ...(pending ? { language: pending } : {}) }
       await supabase.from('profiles').upsert(fresh)
       if (!cancelled) setProfile(fresh)
     })

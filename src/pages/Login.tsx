@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import type { T } from '../lib/i18n'
+import type { Language } from '../lib/types'
 import { HomeIcon } from '../components/Icons'
 
 type Mode = 'link' | 'password'
 
-export default function Login({ t }: { t: T }) {
+export default function Login({ t, lang, onLanguage }: { t: T; lang: Language; onLanguage: (l: Language) => void }) {
   const [mode, setMode] = useState<Mode>('link')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -35,7 +36,13 @@ export default function Login({ t }: { t: T }) {
   return (
     <div className="container">
       <form className="card login" onSubmit={submit}>
-        <span className="brand-mark"><HomeIcon /></span>
+        <div className="login-top">
+          <span className="brand-mark"><HomeIcon /></span>
+          <div className="seg seg-small" role="group" aria-label="Language">
+            <button type="button" aria-pressed={lang === 'en'} onClick={() => onLanguage('en')}>EN</button>
+            <button type="button" aria-pressed={lang === 'ro'} onClick={() => onLanguage('ro')}>RO</button>
+          </div>
+        </div>
         {state === 'sent' ? (
           <>
             <h1>{t('login.sentTitle')}</h1>
@@ -59,6 +66,7 @@ export default function Login({ t }: { t: T }) {
               </label>
             )}
             {state === 'error' && <div className="msg error">{message || t('error.generic')}</div>}
+            {mode === 'password' && <p className="muted" style={{ margin: 0, fontSize: '.9em' }}>{t('login.forgot')}</p>}
             <button className="btn primary" type="submit" disabled={state === 'sending' || !email || (mode === 'password' && !password)}>
               {state === 'sending' ? t('login.sending') : mode === 'password' ? t('login.signIn') : t('login.send')}
             </button>

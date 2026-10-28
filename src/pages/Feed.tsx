@@ -11,7 +11,7 @@ import RatesCard from '../components/RatesCard'
 import CalendarCard from '../components/CalendarCard'
 import SearchBar from '../components/SearchBar'
 import QuickLinks from '../components/QuickLinks'
-import { RefreshIcon } from '../components/Icons'
+import { RefreshIcon, SearchIcon } from '../components/Icons'
 
 const CACHE_KEY = 'homepage.feed'
 type Cached = FeedsResponse & { at: string }
@@ -111,7 +111,10 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
               ))}
             </div>
           )}
-          <input className="input" type="search" placeholder={t('feed.filter')} aria-label={t('feed.filter')} value={query} onChange={(e) => setQuery(e.target.value)} />
+          <label className="filter-box">
+            <SearchIcon />
+            <input type="search" placeholder={t('feed.filter')} aria-label={t('feed.filter')} value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
         </div>
       )}
 
