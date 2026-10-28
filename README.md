@@ -1,0 +1,47 @@
+# Acasă · homepage
+
+A calm, ad-free start page for the family: news from chosen RSS sources, weather, saved articles, per-person settings (language, theme, accent colour, text size, layout).
+
+Live: https://bogdanjurconi.github.io/homepage/
+
+## Stack
+
+- React 19 + Vite + TypeScript, hosted on GitHub Pages (deployed by `.github/workflows/deploy.yml` on every push to `main`).
+- Supabase: Auth (email magic link), Postgres with row-level security, and the `feeds` Edge Function that fetches and caches RSS feeds server-side.
+
+## Local development
+
+```sh
+npm install
+npm run dev        # http://localhost:5173/homepage/
+npm run build      # type-check + production build into dist/
+npm run lint
+```
+
+The browser only needs the Supabase URL and publishable key, which live in `src/lib/supabase.ts` and are safe to commit.
+
+## Supabase
+
+Schema and policies: `supabase/migrations/`. Edge Function: `supabase/functions/feeds/`.
+
+Admin work (migrations, function deploys) uses a project-scoped personal access token kept in `.env` (git-ignored):
+
+```
+SUPABASE_ACCESS_TOKEN=sbp_...
+SUPABASE_PROJECT_REF=...
+```
+
+```sh
+set -a; . ./.env; set +a
+npx supabase functions deploy feeds --project-ref "$SUPABASE_PROJECT_REF" --use-api
+```
+
+## Data model
+
+| Table | Purpose |
+|---|---|
+| `profiles` | one row per user: name, language, theme, accent, text size, layout, weather location |
+| `default_sources` | curated feeds everyone can pick from |
+| `user_sources` | per-user on/off overrides for defaults, plus custom RSS feeds |
+| `feeds` / `feed_items` | server-side cache of fetched feeds, written only by the Edge Function |
+| `saved_articles` | bookmarks |
