@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Key, T } from '../lib/i18n'
 import type { Language } from '../lib/types'
+import WeatherIcon, { themeFor } from './WeatherIcon'
 
 type Props = { lat: number; lon: number; city: string | null; lang: Language; t: T }
 
@@ -9,14 +10,7 @@ type Forecast = {
   daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; precipitation_probability_max: (number | null)[] }
 }
 
-const ICONS: Record<number, string> = {
-  0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️', 45: '🌫️', 48: '🌫️', 51: '🌦️', 53: '🌦️', 55: '🌧️', 56: '🌧️', 57: '🌧️',
-  61: '🌧️', 63: '🌧️', 65: '🌧️', 66: '🌧️', 67: '🌧️', 71: '🌨️', 73: '🌨️', 75: '❄️', 77: '🌨️',
-  80: '🌦️', 81: '🌧️', 82: '⛈️', 85: '🌨️', 86: '🌨️', 95: '⛈️', 96: '⛈️', 99: '⛈️',
-}
-const NIGHT: Record<number, string> = { 0: '🌙', 1: '🌙', 2: '☁️' }
-
-const CACHE_KEY = 'homepage.weather'
+const CACHE_KEY = 'homepage.weather.v3'
 
 export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
   const [data, setData] = useState<Forecast | null>(() => {
@@ -35,42 +29,44 @@ export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
     }).catch(() => setError(true))
   }, [lat, lon, data])
 
-  if (error) return <section className="card weather weather-empty muted">{t('weather.error')}</section>
-  if (!data) return <section className="card weather weather-empty muted">…</section>
+  if (error) return <section className="weather weather-empty muted">{t('weather.error')}</section>
+  if (!data) return <section className="weather weather-empty" data-theme-w="cloudy" aria-busy="true" />
 
-  const code = data.current.weather_code
-  const icon = (data.current.is_day === 0 && NIGHT[code]) || ICONS[code] || '🌡️'
+  const { current: c, daily } = data
+  const isDay = c.is_day === 1
   const dayName = (iso: string, i: number) =>
     i === 0 ? t('weather.today') : i === 1 ? t('weather.tomorrow') : new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(iso))
+  const hi = Math.round(daily.temperature_2m_max[0]), lo = Math.round(daily.temperature_2m_min[0])
 
   return (
-    <section className="card weather" aria-label={t('settings.weather')}>
-      <div className="weather-now">
-        <div className="weather-icon" aria-hidden="true">{icon}</div>
-        <div className="weather-main">
-          <div className="weather-temp">{Math.round(data.current.temperature_2m)}°</div>
-          <div className="weather-cond">{t(`wmo.${code}` as Key)}{city ? <span className="muted"> · {city}</span> : null}</div>
+    <section className="weather" data-theme-w={themeFor(c.weather_code, isDay)} aria-label={t('settings.weather')}>
+      <div className="w-now">
+        <WeatherIcon code={c.weather_code} isDay={isDay} className="w-icon" />
+        <div className="w-temp">{Math.round(c.temperature_2m)}<span>°</span></div>
+        <div className="w-text">
+          <div className="w-cond">{t(`wmo.${c.weather_code}` as Key)}</div>
+          <div className="w-sub">{city}{city ? ' · ' : ''}{t('weather.feels', { t: ` ${Math.round(c.apparent_temperature)}°` })}</div>
+          <div className="w-chips">
+            <span>↑ {hi}°  ↓ {lo}°</span>
+            <span>{t('weather.wind')} {Math.round(c.wind_speed_10m)} km/h</span>
+            <span>{t('weather.humidity')} {c.relative_humidity_2m}%</span>
+          </div>
         </div>
-        <dl className="weather-stats">
-          <div><dt>{t('weather.feels', { t: '' }).trim()}</dt><dd>{Math.round(data.current.apparent_temperature)}°</dd></div>
-          <div><dt>{t('weather.wind')}</dt><dd>{Math.round(data.current.wind_speed_10m)} km/h</dd></div>
-          <div><dt>{t('weather.humidity')}</dt><dd>{data.current.relative_humidity_2m}%</dd></div>
-        </dl>
       </div>
-      <div className="weather-days">
-        {data.daily.time.map((d, i) => {
-          const rain = data.daily.precipitation_probability_max[i]
+      <ol className="w-days">
+        {daily.time.map((d, i) => {
+          const rain = daily.precipitation_probability_max[i]
           return (
-            <div className="weather-day" key={d}>
+            <li key={d}>
               <small>{dayName(d, i)}</small>
-              <span className="weather-day-icon" aria-hidden="true">{ICONS[data.daily.weather_code[i]] ?? '🌡️'}</span>
-              <b>{Math.round(data.daily.temperature_2m_max[i])}°</b>
-              <small>{Math.round(data.daily.temperature_2m_min[i])}°</small>
-              {rain != null && rain >= 20 && <small className="weather-rain" title={t('weather.rain')}>💧 {rain}%</small>}
-            </div>
+              <WeatherIcon code={daily.weather_code[i]} className="w-day-icon" />
+              <b>{Math.round(daily.temperature_2m_max[i])}°</b>
+              <small>{Math.round(daily.temperature_2m_min[i])}°</small>
+              <small className="w-rain">{rain != null && rain >= 20 ? `${rain}%` : ' '}</small>
+            </li>
           )
         })}
-      </div>
+      </ol>
     </section>
   )
 }

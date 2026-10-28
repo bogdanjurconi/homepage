@@ -5,7 +5,7 @@ import { useHashRoute } from './hooks/useHashRoute'
 import { makeT } from './lib/i18n'
 import { DEFAULT_PROFILE, type Language, type Profile } from './lib/types'
 import { readGuestLanguage, setGuestLanguage } from './lib/guestLanguage'
-import Header, { BottomNav } from './components/Header'
+import Header from './components/Header'
 import Login from './pages/Login'
 import Feed from './pages/Feed'
 import Saved from './pages/Saved'
@@ -37,7 +37,6 @@ export default function App() {
           {route.name === 'read' && route.param && <Reader t={t} itemId={route.param} userId={uid} />}
         </div>
       </main>
-      <BottomNav t={t} route={route} go={go} />
     </div>
   )
 }

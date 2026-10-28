@@ -38,6 +38,3 @@ export default function Header(props: Props) {
   )
 }
 
-export function BottomNav(props: Omit<Props, 'name'>) {
-  return <Nav {...props} className="bottom" />
-}
