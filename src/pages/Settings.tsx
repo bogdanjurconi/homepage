@@ -1,7 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
-import { ACCENTS, BACKGROUNDS, FONTS, LAYOUTS, TEXT_SIZES, type Accent, type Background, type DefaultSource, type Font, type Layout, type Profile, type TextSize, type Theme, type UserSource } from '../lib/types'
+import { ACCENTS, BACKGROUNDS, FONTS, LAYOUTS, SEARCH_ENGINES, TEXT_SIZES, type Accent, type Background, type DefaultSource, type Font, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource } from '../lib/types'
+import { useQuickLinks } from '../hooks/useQuickLinks'
+import { faviconFor } from '../components/QuickLinks'
 import { hostname } from '../lib/time'
 
 type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string }
@@ -62,6 +64,18 @@ export default function Settings({ t, profile, update, saving, userId }: Props) 
         </div>
       </section>
 
+      <section className="card section" aria-labelledby="s-front">
+        <h2 id="s-front">{t('settings.frontPage')}</h2>
+        <Toggle label={t('settings.showRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
+        <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
+        <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
+        <div className="field">
+          <span>{t('settings.searchEngine')}</span>
+          <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
+        </div>
+      </section>
+
+      <Links t={t} userId={userId} />
       <Sources t={t} userId={userId} />
       <Weather t={t} profile={profile} update={update} />
 
@@ -71,6 +85,72 @@ export default function Settings({ t, profile, update, saving, userId }: Props) 
         <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button>
       </div>
     </div>
+  )
+}
+
+function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div className="toggle-row">
+      <div className="grow">{label}</div>
+      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
+    </div>
+  )
+}
+
+const SUGGESTED_LINKS: [string, string][] = [
+  ['YouTube', 'https://www.youtube.com'], ['Gmail', 'https://mail.google.com'], ['Facebook', 'https://www.facebook.com'],
+  ['WhatsApp', 'https://web.whatsapp.com'], ['Google Maps', 'https://maps.google.com'], ['Wikipedia', 'https://ro.wikipedia.org'],
+]
+
+function Links({ t, userId }: { t: T; userId: string }) {
+  const { links, add, remove, move } = useQuickLinks(userId)
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [err, setErr] = useState('')
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    const u = url.trim()
+    if (!/^https?:\/\//i.test(u)) { setErr(t('settings.invalidUrl')); return }
+    const name = title.trim() || hostname(u)
+    const error = await add(name, u)
+    if (error) { setErr(error); return }
+    setErr(''); setTitle(''); setUrl('')
+  }
+
+  const suggestions = SUGGESTED_LINKS.filter(([, u]) => !links.some((l) => hostname(l.url) === hostname(u)))
+
+  return (
+    <section className="card section" aria-labelledby="s-links">
+      <h2 id="s-links">{t('links.title')}</h2>
+      {links.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('links.empty')}</p>}
+      <div>
+        {links.map((l, i) => (
+          <div className="toggle-row" key={l.id}>
+            <img src={faviconFor(l.url)} alt="" width={24} height={24} style={{ borderRadius: 6 }} />
+            <div className="grow">{l.title}<small>{l.url}</small></div>
+            <button type="button" className="icon-btn" aria-label="↑" disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
+            <button type="button" className="icon-btn" aria-label="↓" disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
+            <button type="button" className="btn ghost" onClick={() => remove(l.id)}>{t('settings.remove')}</button>
+          </div>
+        ))}
+      </div>
+      {suggestions.length > 0 && (
+        <div className="field">
+          <span>{t('links.suggest')}</span>
+          <div className="seg">
+            {suggestions.map(([n, u]) => <button key={u} type="button" onClick={() => add(n, u)}>+ {n}</button>)}
+          </div>
+        </div>
+      )}
+      <form className="field" onSubmit={submit}>
+        <span>{t('links.add')}</span>
+        <input className="input" type="url" inputMode="url" placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+        <input className="input" placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
+        {err && <div className="msg error">{err}</div>}
+        <div><button className="btn primary" type="submit">{t('settings.add')}</button></div>
+      </form>
+    </section>
   )
 }
 

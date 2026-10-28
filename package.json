@@ -13,6 +13,7 @@
     "@fontsource-variable/nunito": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.1",
     "@supabase/supabase-js": "^2.118.0",
+    "dompurify": "^3.4.17",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
@@ -22,6 +23,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.89.0",
+    "sharp": "^0.35.5",
     "supabase": "^2.122.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"

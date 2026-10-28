@@ -1,11 +1,11 @@
 import type { T } from '../lib/i18n'
-import type { Route } from '../hooks/useHashRoute'
+import type { Route, RouteName } from '../hooks/useHashRoute'
 import { GearIcon, HomeIcon, StarIcon } from './Icons'
 
-type Props = { t: T; route: Route; go: (r: Route) => void; name?: string | null }
+type Props = { t: T; route: Route; go: (r: RouteName) => void; name?: string | null }
 
 function Nav({ t, route, go, className }: Props & { className?: string }) {
-  const items: { r: Route; label: string; icon: React.ReactNode }[] = [
+  const items: { r: RouteName; label: string; icon: React.ReactNode }[] = [
     { r: 'feed', label: t('nav.feed'), icon: <HomeIcon /> },
     { r: 'saved', label: t('nav.saved'), icon: <StarIcon /> },
     { r: 'settings', label: t('nav.settings'), icon: <GearIcon /> },
@@ -13,7 +13,7 @@ function Nav({ t, route, go, className }: Props & { className?: string }) {
   return (
     <nav className={`nav ${className ?? ''}`} aria-label="Main">
       {items.map((i) => (
-        <button key={i.r} type="button" onClick={() => go(i.r)} aria-current={route === i.r ? 'page' : undefined}>
+        <button key={i.r} type="button" onClick={() => go(i.r)} aria-current={route.name === i.r ? 'page' : undefined}>
           {i.icon}
           <span>{i.label}</span>
         </button>
