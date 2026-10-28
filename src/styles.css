@@ -345,37 +345,29 @@ input, select, textarea, button { min-width: 0; max-width: 100%; }
 @media (max-width: 719px) { .filter-box { flex: 1 1 auto; width: 100%; } }
 .login-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
-/* ---------- weather v3 ---------- */
-.weather { position: relative; display: grid; gap: 12px; padding: 18px 20px 14px; border-radius: var(--radius); color: #fff; box-shadow: var(--shadow); overflow: hidden; isolation: isolate; }
-.weather[data-theme-w="clear"]  { background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 55%, #93c5fd 100%); }
-.weather[data-theme-w="partly"] { background: linear-gradient(135deg, #4b7fd6 0%, #7aa2e8 60%, #a9bfe6 100%); }
-.weather[data-theme-w="cloudy"] { background: linear-gradient(135deg, #5b6b82 0%, #7c8ca3 60%, #9aa8bb 100%); }
-.weather[data-theme-w="rain"]   { background: linear-gradient(135deg, #3f5f86 0%, #5a7ba6 60%, #7f9bc0 100%); }
-.weather[data-theme-w="snow"]   { background: linear-gradient(135deg, #7fa3cf 0%, #a9c4e4 60%, #d3e2f2 100%); color: #10243d; }
-.weather[data-theme-w="night"]  { background: linear-gradient(135deg, #1e2a4a 0%, #2f3b6e 60%, #4a4a8a 100%); }
+/* ---------- weather (follows the theme) ---------- */
+.weather { display: grid; gap: 12px; padding: 18px 20px 14px; }
 .weather-empty { min-height: 120px; }
-.weather-empty.muted { color: var(--muted); background: var(--card); }
 .w-now { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 4px 14px; }
-.w-icon { width: 56px; height: 56px; stroke-width: 1.4; filter: drop-shadow(0 2px 6px rgb(0 0 0 / .18)); }
+.w-icon { width: 56px; height: 56px; stroke-width: 1.4; color: var(--accent); }
 .w-temp { font-size: 3.2em; font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.w-temp span { font-size: .55em; font-weight: 600; vertical-align: top; margin-left: 2px; opacity: .85; }
+.w-temp span { font-size: .55em; font-weight: 600; vertical-align: top; margin-left: 2px; color: var(--muted); }
 .w-text { display: grid; gap: 4px; min-width: 0; }
 .w-cond { font-weight: 700; font-size: 1.05em; line-height: 1.2; }
-.w-sub { opacity: .88; font-size: .92em; }
+.w-sub { color: var(--muted); font-size: .92em; }
 .w-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
-.w-chips span { padding: 3px 9px; border-radius: 999px; background: rgb(255 255 255 / .18); font-size: .78em; font-weight: 600; white-space: nowrap; backdrop-filter: blur(4px); }
-.weather[data-theme-w="snow"] .w-chips span { background: rgb(16 36 61 / .12); }
-.w-days { list-style: none; margin: 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; border-top: 1px solid rgb(255 255 255 / .28); text-align: center; }
-.weather[data-theme-w="snow"] .w-days { border-top-color: rgb(16 36 61 / .2); }
+.w-chips span { padding: 3px 9px; border-radius: 999px; background: var(--chip); font-size: .78em; font-weight: 600; white-space: nowrap; }
+.w-chips span:first-child { background: var(--accent-soft); color: var(--accent); }
+.w-days { list-style: none; margin: 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; border-top: 1px solid var(--line); text-align: center; }
 .w-days li { display: grid; justify-items: center; gap: 1px; line-height: 1.25; }
-.w-days small { opacity: .82; font-size: .8em; }
+.w-days small { color: var(--muted); font-size: .8em; }
 .w-days b { font-size: 1.05em; }
-.w-day-icon { width: 28px; height: 28px; margin: 3px 0; }
-.w-rain { font-weight: 700; opacity: 1 !important; }
+.w-day-icon { width: 28px; height: 28px; margin: 3px 0; color: var(--accent); }
+.w-rain { color: var(--accent) !important; font-weight: 700; }
 .hero .weather { flex: 1 1 400px; max-width: 580px; }
 @media (max-width: 719px) { .hero .weather { max-width: none; } }
 @media (max-width: 420px) {
   .w-now { grid-template-columns: auto minmax(0, 1fr); }
-  .w-icon { grid-row: 1 / span 1; width: 48px; height: 48px; }
+  .w-icon { width: 48px; height: 48px; }
   .w-text { grid-column: 1 / -1; }
 }

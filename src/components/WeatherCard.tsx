@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Key, T } from '../lib/i18n'
 import type { Language } from '../lib/types'
-import WeatherIcon, { themeFor } from './WeatherIcon'
+import WeatherIcon from './WeatherIcon'
 
 type Props = { lat: number; lon: number; city: string | null; lang: Language; t: T }
 
@@ -29,8 +29,8 @@ export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
     }).catch(() => setError(true))
   }, [lat, lon, data])
 
-  if (error) return <section className="weather weather-empty muted">{t('weather.error')}</section>
-  if (!data) return <section className="weather weather-empty" data-theme-w="cloudy" aria-busy="true" />
+  if (error) return <section className="card weather weather-empty muted">{t('weather.error')}</section>
+  if (!data) return <section className="card weather weather-empty" aria-busy="true" />
 
   const { current: c, daily } = data
   const isDay = c.is_day === 1
@@ -39,7 +39,7 @@ export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
   const hi = Math.round(daily.temperature_2m_max[0]), lo = Math.round(daily.temperature_2m_min[0])
 
   return (
-    <section className="weather" data-theme-w={themeFor(c.weather_code, isDay)} aria-label={t('settings.weather')}>
+    <section className="card weather" aria-label={t('settings.weather')}>
       <div className="w-now">
         <WeatherIcon code={c.weather_code} isDay={isDay} className="w-icon" />
         <div className="w-temp">{Math.round(c.temperature_2m)}<span>°</span></div>

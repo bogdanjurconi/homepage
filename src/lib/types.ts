@@ -52,7 +52,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   open_in_reader: false,
   is_admin: false,
   has_password: false,
-  show_summary: false,
+  show_summary: true,
   rate_currencies: ['EUR', 'USD', 'GBP'],
   weather_city: null,
   weather_lat: null,

@@ -35,12 +35,3 @@ export default function WeatherIcon({ code, isDay = true, className }: { code: n
   )
 }
 
-export function themeFor(code: number, isDay: boolean): string {
-  const kind = kindFor(code, isDay)
-  if (!isDay) return 'night'
-  if (kind === 'sun') return 'clear'
-  if (kind === 'partly') return 'partly'
-  if (kind === 'rain' || kind === 'drizzle' || kind === 'thunder') return 'rain'
-  if (kind === 'snow') return 'snow'
-  return 'cloudy'
-}
