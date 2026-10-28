@@ -7,6 +7,7 @@ import {
 } from '../lib/types'
 import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
+import { CURRENCIES } from '../lib/types'
 import { faviconFor } from '../components/QuickLinks'
 import { StarIcon, BookIcon } from '../components/Icons'
 
@@ -109,6 +110,21 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
 
         <Section id="front" ref={reg('front')} title={t('settings.frontPage')} desc={t('settings.frontPageDesc')}>
           <Toggle label={t('settings.showRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
+          {profile.show_rates && (
+            <Field label={t('settings.rateCurrencies')}>
+              <div className="seg seg-small">
+                {CURRENCIES.map((c) => {
+                  const on = profile.rate_currencies.includes(c)
+                  return (
+                    <button key={c} type="button" aria-pressed={on} disabled={on && profile.rate_currencies.length === 1}
+                      onClick={() => update({ rate_currencies: on ? profile.rate_currencies.filter((x) => x !== c) : [...CURRENCIES].filter((x) => x === c || profile.rate_currencies.includes(x)) })}>
+                      {c}
+                    </button>
+                  )
+                })}
+              </div>
+            </Field>
+          )}
           <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
           <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
           <Field label={t('settings.searchEngine')}>

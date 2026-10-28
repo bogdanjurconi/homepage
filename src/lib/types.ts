@@ -29,6 +29,7 @@ export interface Profile {
   show_calendar: boolean
   open_in_reader: boolean
   is_admin: boolean
+  rate_currencies: string[]
   weather_city: string | null
   weather_lat: number | null
   weather_lon: number | null
@@ -48,6 +49,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   show_calendar: true,
   open_in_reader: false,
   is_admin: false,
+  rate_currencies: ['EUR', 'USD', 'GBP'],
   weather_city: null,
   weather_lat: null,
   weather_lon: null,
@@ -110,10 +112,22 @@ export interface QuickLink {
   sort_order: number
 }
 
+export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HUF', 'PLN', 'CZK', 'SEK', 'NOK', 'DKK', 'CAD', 'AUD', 'JPY', 'TRY', 'BGN'] as const
+
+export interface Rate {
+  code: string
+  value: number
+  multiplier: number
+  prev_value: number | null
+  change: number | null
+  change_pct: number | null
+}
+
 export interface Rates {
   date: string
+  prev_date: string | null
   source: string
-  rates: { code: string; value: number; multiplier: number }[]
+  rates: Rate[]
 }
 
 export interface ReaderArticle {

@@ -318,3 +318,29 @@ h2 { font-size: 1.2em; margin: 0 0 12px; }
 :root[data-theme="dark"] .lang-badge.lang-en { color: #fca5a5; }
 .seg-small button { min-height: 36px; padding: 0 12px; font-size: .9em; }
 .add-source .row { align-items: stretch; }
+
+/* ---------- rates v2 ---------- */
+.rates-list li { align-items: baseline; }
+.rates-code { white-space: nowrap; }
+.rates-val { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.rates-chg { font-size: .8em; color: var(--muted); font-weight: 600; }
+.rates-chg.up { color: #b45309; }
+.rates-chg.down { color: #15803d; }
+:root[data-theme="dark"] .rates-chg.up { color: #fbbf24; }
+:root[data-theme="dark"] .rates-chg.down { color: #4ade80; }
+
+/* ---------- responsive hardening ---------- */
+.app { overflow-x: clip; }
+input, select, textarea, button { min-width: 0; max-width: 100%; }
+.field, .field > *, .stack > *, .two-col > *, .look-grid > *, .settings-main > *, .section > * { min-width: 0; }
+.src-card > * { min-width: 0; }
+.src-card .lang-badge, .src-card .switch, .src-card .src-icon, .src-card .icon-btn { min-width: auto; flex-shrink: 0; }
+.rates-head, .hero-text { min-width: 0; }
+@media (max-width: 719px) {
+  .filter-row { flex-direction: column; align-items: stretch; }
+  .filter-row .chips { width: 100%; }
+  .filter-row .input { flex: 1 1 auto; width: 100%; min-width: 0; }
+  .filter-row > .muted { margin-left: 0 !important; }
+  .settings-main .section { padding: 18px 16px; }
+  .look-preview { display: none; }
+}

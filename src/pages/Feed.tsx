@@ -88,7 +88,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       {showSideWidgets && (
         <div className="widgets">
           {profile.show_calendar && <CalendarCard lang={profile.language} t={t} />}
-          {profile.show_rates && <RatesCard lang={profile.language} t={t} />}
+          {profile.show_rates && <RatesCard lang={profile.language} t={t} codes={profile.rate_currencies} />}
         </div>
       )}
 
