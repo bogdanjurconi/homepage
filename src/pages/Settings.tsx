@@ -162,7 +162,8 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
           <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
         </Section>
 
-        <Section id="links" ref={reg('links')} title={t('links.title')} desc={t('settings.linksDesc')}>
+        {/* Each section's description is one paragraph: what it does, then how to use it. */}
+        <Section id="links" ref={reg('links')} title={t('links.title')} desc={`${t('settings.linksDesc')} ${t('links.empty')}`}>
           <Links t={t} userId={userId} />
         </Section>
 
@@ -170,11 +171,11 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
           <Sources t={t} userId={userId} />
         </Section>
 
-        <Section id="weather" ref={reg('weather')} title={t('settings.weather')} desc={t('settings.weatherDesc')}>
+        <Section id="weather" ref={reg('weather')} title={t('settings.weather')} desc={`${t('settings.weatherDesc')} ${t('settings.weatherLead')}`}>
           <Weather t={t} profile={profile} update={update} />
         </Section>
 
-        <Section id="sport" ref={reg('sport')} title={t('settings.sport')} desc={t('settings.sportDesc')}>
+        <Section id="sport" ref={reg('sport')} title={t('settings.sport')} desc={`${t('settings.sportDesc')} ${t('settings.sportLead')}`}>
           <SportTeams t={t} teams={profile.teams} onChange={(teams) => update({ teams })} />
         </Section>
 
@@ -386,10 +387,10 @@ function Links({ t, userId }: { t: T; userId: string }) {
 
   const suggestions = SUGGESTED_LINKS.filter(([, u]) => !links.some((l) => hostname(l.url) === hostname(u)))
 
+  // One column across the section: the links as a grid of cards, the suggestions on one line, the form on one row.
   return (
-    <div className="two-col">
-      <div className="stack">
-        {links.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('links.empty')}</p>}
+    <div className="stack">
+      {links.length > 0 && (
         <div className="src-grid">
           {links.map((l, i) => (
             <div className="src-card" key={l.id}>
@@ -401,25 +402,23 @@ function Links({ t, userId }: { t: T; userId: string }) {
             </div>
           ))}
         </div>
-      </div>
-      <div className="stack">
-        {suggestions.length > 0 && (
-          <Field label={t('links.suggest')}>
-            <div className="seg">
-              {suggestions.map(([n, u]) => <button key={u} type="button" disabled={busy} onClick={() => suggest(n, u)}>+ {n}</button>)}
-            </div>
-          </Field>
-        )}
-        <form className="field add-source" onSubmit={submit}>
-          <span>{t('links.add')}</span>
-          <input className="input" type="text" inputMode="url" autoComplete="off" enterKeyHint="done" aria-label={t('links.url')} placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-          <div className="row">
-            <input className="input" style={{ flex: 1 }} autoComplete="off" aria-label={t('links.name')} placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
-            <button className="btn primary" type="submit" disabled={busy}>{t('settings.add')}</button>
+      )}
+      {suggestions.length > 0 && (
+        <Field label={t('links.suggest')}>
+          <div className="seg seg-small">
+            {suggestions.map(([n, u]) => <button key={u} type="button" disabled={busy} onClick={() => suggest(n, u)}>+ {n}</button>)}
           </div>
-          {err && <div className="msg error">{err}</div>}
-        </form>
-      </div>
+        </Field>
+      )}
+      <form className="field add-source add-link" onSubmit={submit}>
+        <span>{t('links.add')}</span>
+        <div className="row">
+          <input className="input link-url" type="text" inputMode="url" autoComplete="off" enterKeyHint="done" aria-label={t('links.url')} placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <input className="input link-name" autoComplete="off" aria-label={t('links.name')} placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <button className="btn primary" type="submit" disabled={busy}>{t('settings.add')}</button>
+        </div>
+        {err && <div className="msg error">{err}</div>}
+      </form>
     </div>
   )
 }
@@ -576,7 +575,7 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
           <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
             onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
         </div>
-      ) : <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>}
+      ) : null}
       <input className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.weatherCity')} placeholder={t('settings.weatherCity')}
         value={q} onChange={(e) => setQ(e.target.value)} />
       {shown && shown.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
@@ -623,7 +622,6 @@ function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (te
 
   return (
     <div className="stack picker">
-      {teams.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLead')}</p>}
       {teams.map((team) => (
         <div key={team.id} className="src-card">
           {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
