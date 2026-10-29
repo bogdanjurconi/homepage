@@ -10,7 +10,8 @@ function readCache(userId: string): Profile | null {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const p = JSON.parse(raw) as Profile
-    return p.id === userId ? p : null
+    // Older cached copies lack newer fields (e.g. teams): fill them from the defaults.
+    return p.id === userId ? { ...DEFAULT_PROFILE, ...p } : null
   } catch { return null }
 }
 
@@ -34,7 +35,8 @@ export function useProfile(userId: string | undefined) {
       if (cancelled) return
       const pending = takePendingLanguage()
       if (data) {
-        const loaded = { ...(data as Profile), ...(pending ? { language: pending } : {}) }
+        const loaded: Profile = { ...DEFAULT_PROFILE, ...(data as Profile), ...(pending ? { language: pending } : {}) }
+        if (!Array.isArray(loaded.teams)) loaded.teams = []
         setProfile(loaded); localStorage.setItem(CACHE_KEY, JSON.stringify(loaded))
         if (pending && pending !== (data as Profile).language) await supabase.from('profiles').update({ language: pending }).eq('id', userId)
         return
