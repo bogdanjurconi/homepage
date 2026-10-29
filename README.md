@@ -1,4 +1,4 @@
-# Acasă · homepage
+# Homepage
 
 A calm, ad-free start page for the family: news from chosen RSS sources grouped in sections, an ad-free web search bar, quick links, weather, exchange rates, a Romanian holidays and name-days calendar, reader mode, saved articles, and per-person settings (language, theme, accent colour, font, background, text size, layout).
 

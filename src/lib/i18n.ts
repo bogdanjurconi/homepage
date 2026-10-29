@@ -1,7 +1,7 @@
 import type { Language } from './types'
 
 const ro = {
-  appName: 'Acasă',
+  appName: 'Homepage',
   'nav.feed': 'Știri',
   'nav.saved': 'Salvate',
   'nav.settings': 'Setări',
@@ -192,7 +192,7 @@ const ro = {
 export type Key = keyof typeof ro
 
 const en: Record<Key, string> = {
-  appName: 'Home',
+  appName: 'Homepage',
   'nav.feed': 'News',
   'nav.saved': 'Saved',
   'nav.settings': 'Settings',

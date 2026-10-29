@@ -1,6 +1,6 @@
 {
-  "name": "Acasă",
-  "short_name": "Acasă",
+  "name": "Homepage",
+  "short_name": "Homepage",
   "description": "O pagină de start liniștită, fără reclame.",
   "start_url": "/homepage/",
   "scope": "/homepage/",
