@@ -1,6 +1,6 @@
 import type { T } from '../lib/i18n'
 import type { Route, RouteName } from '../hooks/useHashRoute'
-import { GearIcon, HomeIcon, StarIcon } from './Icons'
+import { BrandIcon, GearIcon, HomeIcon, StarIcon } from './Icons'
 
 type Props = { t: T; route: Route; go: (r: RouteName) => void; name?: string | null }
 
@@ -28,7 +28,7 @@ export default function Header(props: Props) {
     <header className="header">
       <div className="container">
         <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); go('feed') }}>
-          <span className="brand-mark"><HomeIcon /></span>
+          <span className="brand-mark"><BrandIcon /></span>
           {t('appName')}
         </a>
         <span className="spacer" />

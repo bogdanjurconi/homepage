@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 import type { T } from '../lib/i18n'
 import type { Language } from '../lib/types'
-import { HomeIcon } from '../components/Icons'
+import { BrandIcon } from '../components/Icons'
 
 type Mode = 'link' | 'password'
 
@@ -37,7 +37,7 @@ export default function Login({ t, lang, onLanguage }: { t: T; lang: Language; o
     <div className="container">
       <form className="card login" onSubmit={submit}>
         <div className="login-top">
-          <span className="brand"><span className="brand-mark"><HomeIcon /></span>{t('appName')}</span>
+          <span className="brand"><span className="brand-mark"><BrandIcon /></span>{t('appName')}</span>
           <div className="seg seg-small" role="group" aria-label={t('settings.language')}>
             <button type="button" aria-pressed={lang === 'en'} onClick={() => onLanguage('en')}>EN</button>
             <button type="button" aria-pressed={lang === 'ro'} onClick={() => onLanguage('ro')}>RO</button>

@@ -74,7 +74,7 @@ main { flex: 1; padding: 16px 0 calc(40px + env(safe-area-inset-bottom)); }
 }
 .header .container { display: flex; align-items: center; gap: 12px; min-height: 60px; padding-top: env(safe-area-inset-top); }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15em; text-decoration: none; }
-.brand-mark { width: 1.6em; height: 1.6em; border-radius: 30%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; }
+.brand-mark { width: 1.6em; height: 1.6em; border-radius: 22%; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; }
 .spacer { flex: 1; }
 .nav { display: flex; gap: 4px; }
 .nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: var(--tap); min-height: var(--tap); padding: 6px 14px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-weight: 600; }
