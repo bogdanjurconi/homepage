@@ -14,6 +14,9 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_ITEMS_PER_FEED = 40;
 const KEEP_DAYS = 14;
 const MAX_ITEMS_RETURNED = 400;
+// Feeds without pictures (HotNews): take the article's og:image, a few new articles per refresh.
+const PAGE_IMAGES_PER_REFRESH = 20;
+const PAGE_TIMEOUT_MS = 5_000;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -101,6 +104,7 @@ async function refreshFeed(admin: SupabaseClient, url: string) {
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
     await admin.from("feeds").upsert({ url, title: feed.title?.value ?? null, last_fetched_at: fetchedAt, last_status: status, last_error: null });
+    await fillPageImages(admin, url, rows);
     if (rows.length) {
       const { error } = await admin.from("feed_items").upsert(rows, { onConflict: "feed_url,guid" });
       if (error) throw error;
@@ -112,6 +116,50 @@ async function refreshFeed(admin: SupabaseClient, url: string) {
     await admin.from("feeds").upsert({ url, last_fetched_at: fetchedAt, last_status: status, last_error: message.slice(0, 300) });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// Items whose feed entry has no picture keep the one found earlier, else get the page's og:image.
+async function fillPageImages(admin: SupabaseClient, feedUrl: string, rows: { guid: string; link: string; image_url: string | null; page_image_checked: boolean }[]) {
+  const missing = rows.filter((r) => !r.image_url);
+  if (!missing.length) return;
+  const { data: known } = await admin.from("feed_items").select("guid,image_url,page_image_checked")
+    .eq("feed_url", feedUrl).in("guid", missing.map((r) => r.guid));
+  const todo: typeof missing = [];
+  for (const r of missing) {
+    const k = known?.find((x) => x.guid === r.guid);
+    if (k?.image_url) r.image_url = k.image_url;
+    else if (!k?.page_image_checked) todo.push(r);
+    r.page_image_checked = !!k?.page_image_checked;
+  }
+  await Promise.all(todo.slice(0, PAGE_IMAGES_PER_REFRESH).map(async (r) => {
+    r.image_url = await pageImage(r.link);
+    r.page_image_checked = true;
+  }));
+}
+
+async function pageImage(link: string): Promise<string | null> {
+  try {
+    const res = await fetch(link, {
+      signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; HomepageFeedReader/1.0)", "Accept": "text/html" },
+    });
+    if (!res.ok || !res.body) return null;
+    // The meta tags sit in <head>: read until it closes, not the whole page.
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let head = "";
+    while (head.length < 300_000) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      head += value;
+      if (head.includes("</head>")) break;
+    }
+    reader.cancel().catch(() => {});
+    const m = head.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*content=["']([^"']+)["']/i)
+      ?? head.match(/<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    return m?.[1] ? new URL(decodeEntities(m[1]), link).href : null;
+  } catch {
+    return null;
   }
 }
 
@@ -134,6 +182,7 @@ function toRow(feedUrl: string, e: any, fetchedAt: string, raw: Map<string, stri
     link,
     summary,
     image_url: findImage(e, html),
+    page_image_checked: false,
     published_at: published,
     fetched_at: fetchedAt,
   };
