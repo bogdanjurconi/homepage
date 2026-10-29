@@ -10,6 +10,7 @@ import { usePaged } from '../hooks/usePaged'
 import ArticleCard from '../components/ArticleCard'
 import WeatherCard from '../components/WeatherCard'
 import RatesCard from '../components/RatesCard'
+import SportCard from '../components/SportCard'
 import CalendarCard from '../components/CalendarCard'
 import SearchBar from '../components/SearchBar'
 import QuickLinks from '../components/QuickLinks'
@@ -66,7 +67,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
   const greeting = t(hour < 5 ? 'greeting.night' : hour < 12 ? 'greeting.morning' : hour < 18 ? 'greeting.day' : 'greeting.evening')
   const today = new Intl.DateTimeFormat(profile.language, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
   const layoutClass = profile.layout === 'list' ? 'list' : profile.layout === 'magazine' ? 'magazine' : 'grid'
-  const showSideWidgets = profile.show_rates || profile.show_calendar
+  const showSideWidgets = profile.show_rates || profile.show_calendar || profile.teams.length > 0
 
   return (
     <>
@@ -87,6 +88,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
         <div className="widgets">
           {profile.show_calendar && <CalendarCard lang={profile.language} t={t} />}
           {profile.show_rates && <RatesCard lang={profile.language} t={t} codes={profile.rate_currencies} />}
+          {profile.teams.length > 0 && <SportCard teams={profile.teams} lang={profile.language} t={t} />}
         </div>
       )}
 

@@ -7,7 +7,7 @@ import {
 } from '../lib/types'
 import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
-import { CURRENCIES } from '../lib/types'
+import { CURRENCIES, MAX_TEAMS, type SportTeamOption, type Team } from '../lib/types'
 import { faviconFor } from '../components/QuickLinks'
 import { StarIcon, BookIcon } from '../components/Icons'
 import WeatherIcon from '../components/WeatherIcon'
@@ -24,10 +24,10 @@ function normalizeUrl(raw: string): string | null {
   } catch { return null }
 }
 
-type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account' | 'invites'
+type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'sport' | 'account' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
   { id: 'profile', key: 'settings.profile' }, { id: 'look', key: 'settings.appearance' }, { id: 'front', key: 'settings.frontPage' },
-  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'account', key: 'settings.account' },
+  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'sport', key: 'settings.sport' }, { id: 'account', key: 'settings.account' },
   { id: 'invites', key: 'invites.title' },
 ]
 
@@ -166,6 +166,10 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
 
         <Section id="weather" ref={reg('weather')} title={t('settings.weather')} desc={t('settings.weatherDesc')}>
           <Weather t={t} profile={profile} update={update} />
+        </Section>
+
+        <Section id="sport" ref={reg('sport')} title={t('settings.sport')} desc={t('settings.sportDesc')}>
+          <SportTeams t={t} teams={profile.teams} onChange={(teams) => update({ teams })} />
         </Section>
 
         <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
@@ -518,6 +522,69 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
             {results.map((r) => (
               <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
                 {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Diacritics-insensitive match for the team search ("Munchen" finds "München").
+const foldText = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const TEAMS_CACHE = 'homepage.sport.teams'
+
+function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (teams: Team[]) => void }) {
+  const [q, setQ] = useState('')
+  const [options, setOptions] = useState<SportTeamOption[] | null>(() => {
+    try { const c = JSON.parse(sessionStorage.getItem(TEAMS_CACHE) ?? 'null'); return c && Date.now() - c.at < 86_400_000 ? c.teams : null } catch { return null }
+  })
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle')
+
+  // The list (a few hundred teams) is fetched once, when the person starts searching, then filtered locally.
+  async function ensureOptions() {
+    if (options || state === 'loading') return
+    setState('loading')
+    const { data, error } = await supabase.functions.invoke<{ teams: SportTeamOption[]; complete: boolean }>('sport', { body: { action: 'teams' } })
+    if (error || !data?.teams) { setState('error'); return }
+    setOptions(data.teams); setState('idle')
+    if (data.complete) sessionStorage.setItem(TEAMS_CACHE, JSON.stringify({ at: Date.now(), teams: data.teams }))
+  }
+
+  const query = foldText(q.trim())
+  const results = query.length < 2 || !options ? [] : options
+    .filter((o) => !teams.some((x) => x.id === o.id))
+    .filter((o) => foldText(`${o.name} ${o.short_name ?? ''} ${o.tla ?? ''} ${o.area ?? ''}`).includes(query))
+    .slice(0, 8)
+  const full = teams.length >= MAX_TEAMS
+
+  return (
+    <div className="two-col">
+      <div className="stack">
+        {teams.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLead')}</p>}
+        {teams.map((team) => (
+          <div key={team.id} className="src-card">
+            {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
+            <div className="grow"><b>{team.name}</b></div>
+            <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
+              onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
+          </div>
+        ))}
+      </div>
+      <div className="stack">
+        {full ? <p className="muted" style={{ margin: 0 }}>{t('settings.sportMax', { n: MAX_TEAMS })}</p> : (
+          <input className="input" type="text" inputMode="search" autoComplete="off" aria-label={t('settings.sportSearch')} placeholder={t('settings.sportSearch')}
+            value={q} onFocus={ensureOptions} onChange={(e) => { setQ(e.target.value); void ensureOptions() }} />
+        )}
+        {state === 'loading' && query && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLoading')}</p>}
+        {state === 'error' && <p className="muted" style={{ margin: 0 }}>{t('settings.sportUnavailable')}</p>}
+        {options && query.length >= 2 && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportNone')}</p>}
+        {results.length > 0 && (
+          <div className="results">
+            {results.map((o) => (
+              <button key={o.id} type="button" onClick={() => { onChange([...teams, { id: o.id, name: o.name, tla: o.tla, crest: o.crest }]); setQ('') }}>
+                {o.name}{o.area ? ` · ${o.area}` : ''}
               </button>
             ))}
           </div>

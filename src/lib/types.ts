@@ -35,6 +35,7 @@ export interface Profile {
   weather_city: string | null
   weather_lat: number | null
   weather_lon: number | null
+  teams: Team[]
 }
 
 export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
@@ -57,6 +58,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   weather_city: null,
   weather_lat: null,
   weather_lon: null,
+  teams: [],
 }
 
 export type Category = 'news' | 'tech' | 'sport' | 'other' | 'custom'
@@ -133,6 +135,35 @@ export interface Rates {
   source: string
   rates: Rate[]
 }
+
+// Football (football-data.org ids). A followed team is stored on the profile with what the card needs to draw it.
+export interface Team {
+  id: number
+  name: string
+  tla: string | null
+  crest: string | null
+}
+export const MAX_TEAMS = 5
+
+export interface SportTeamOption extends Team {
+  short_name: string | null
+  area: string | null
+  competitions: string[]
+}
+
+export interface SportSide { id: number; name: string; shortName: string | null; tla: string | null; crest: string | null }
+export interface SportMatch {
+  id: number
+  utcDate: string
+  status: string
+  minute: number | null
+  competition: { name: string; code: string; emblem: string | null }
+  home: SportSide
+  away: SportSide
+  score: { home: number | null; away: number | null }
+}
+export interface SportTeamStatus { team: SportSide; live: SportMatch | null; next: SportMatch | null; last: SportMatch | null; error?: string }
+export interface SportResponse { teams: SportTeamStatus[]; at: string }
 
 export interface ReaderArticle {
   title: string

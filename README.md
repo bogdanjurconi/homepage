@@ -1,13 +1,13 @@
 # Homepage
 
-A calm, ad-free start page for the family: news from chosen RSS sources grouped in sections, an ad-free web search bar, quick links, weather, exchange rates, a Romanian holidays and name-days calendar, reader mode, saved articles, and per-person settings (language, theme, accent colour, font, background, text size, layout).
+A calm, ad-free start page for the family: news from chosen RSS sources grouped in sections, an ad-free web search bar, quick links, weather, exchange rates, followed football teams (next match and live score), a Romanian holidays and name-days calendar, reader mode, saved articles, and per-person settings (language, theme, accent colour, font, background, text size, layout).
 
 Live: https://bogdanjurconi.github.io/homepage/
 
 ## Stack
 
 - React 19 + Vite + TypeScript, hosted on GitHub Pages (deployed by `.github/workflows/deploy.yml` on every push to `main`).
-- Supabase: Auth (email magic link), Postgres with row-level security, and three Edge Functions: `feeds` (fetches and caches RSS server-side), `reader` (Mozilla Readability extraction for items in the feed cache), `rates` (ECB reference rates in RON).
+- Supabase: Auth (email magic link), Postgres with row-level security, and Edge Functions: `feeds` (fetches and caches RSS server-side), `reader` (Mozilla Readability extraction for items in the feed cache), `rates` (ECB reference rates in RON), `sport` (football-data.org fixtures and live scores for followed teams, cached in Postgres), `admin` (invitations).
 
 ## Local development
 
@@ -22,7 +22,9 @@ The browser only needs the Supabase URL and publishable key, which live in `src/
 
 ## Supabase
 
-Schema and policies: `supabase/migrations/`. Edge Functions: `supabase/functions/{feeds,reader,rates}/`.
+Schema and policies: `supabase/migrations/`. Edge Functions: `supabase/functions/{feeds,reader,rates,sport,admin}/`.
+
+The `sport` function needs a [football-data.org](https://www.football-data.org/) key (free plan) stored as a function secret: `npx supabase secrets set FOOTBALL_DATA_KEY=... --project-ref "$SUPABASE_PROJECT_REF"`.
 
 Admin work (migrations, function deploys) uses a project-scoped personal access token kept in `.env` (git-ignored):
 
@@ -46,6 +48,7 @@ npx supabase functions deploy feeds --project-ref "$SUPABASE_PROJECT_REF" --use-
 | `feeds` / `feed_items` | server-side cache of fetched feeds, written only by the Edge Function |
 | `saved_articles` | bookmarks |
 | `quick_links` | per-user tiles shown under the search bar |
+| `sport_teams` / `sport_competitions` / `sport_cache` | football-data.org team list and per-team match cache, written only by the `sport` function |
 
 PWA icons are rendered from the SVG mark with `node scripts/icons.mjs`.
 
