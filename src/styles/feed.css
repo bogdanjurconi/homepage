@@ -31,6 +31,8 @@
 .article-foot .article-src { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .article-foot .article-src b, .article-foot .article-src time { overflow: hidden; text-overflow: ellipsis; }
 .article-actions { display: flex; position: relative; z-index: 1; margin-right: -8px; }
+/* the next page of cards loads when this row scrolls near; the button is the fallback */
+.feed-more { display: flex; justify-content: center; padding: 18px 0 6px; }
 /* compact list layout */
 .list { display: flex; flex-direction: column; gap: 8px; }
 .list .article { flex-direction: row; align-items: stretch; }

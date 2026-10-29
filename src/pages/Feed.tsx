@@ -6,6 +6,7 @@ import { timeAgo } from '../lib/time'
 import { FEED_CACHE_KEY, readFeedCache, type CachedFeed } from '../lib/feedCache'
 import { useSaved } from '../hooks/useSaved'
 import { useQuickLinks } from '../hooks/useQuickLinks'
+import { usePaged } from '../hooks/usePaged'
 import ArticleCard from '../components/ArticleCard'
 import WeatherCard from '../components/WeatherCard'
 import RatesCard from '../components/RatesCard'
@@ -55,6 +56,9 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
     if (q) all = all.filter((i) => fold(`${i.title} ${i.summary ?? ''} ${sourceName(i.feed_url)}`).includes(q))
     return all
   }, [data, section, query, sourceByUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Cards are rendered a page at a time; the rest follow as the reader scrolls. A refresh keeps the
+  // depth already revealed, so a background update never pulls the list away from under the reader.
+  const { shown, hasMore, more, sentinel } = usePaged(items, `${section}|${query}`)
 
   const failed = (data?.sources ?? []).filter((s) => s.last_error)
   const hasWeather = profile.weather_lat != null && profile.weather_lon != null
@@ -120,12 +124,17 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       )}
 
       <div className={layoutClass}>
-        {items.map((item, i) => (
+        {shown.map((item, i) => (
           <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t}
             saved={savedIds.has(item.id)} onToggleSave={toggle} showImage={profile.layout !== 'list'} openInReader={profile.open_in_reader} showSummary={profile.show_summary}
             className={profile.layout === 'magazine' && i === 0 && !!item.image_url ? 'lead' : undefined} />
         ))}
       </div>
+      {hasMore && (
+        <div className="feed-more" ref={sentinel}>
+          <button type="button" className="btn ghost" onClick={more}>{t('feed.more')}</button>
+        </div>
+      )}
     </>
   )
 }
