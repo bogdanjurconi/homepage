@@ -33,18 +33,25 @@
 .rates-chg.down { color: #15803d; }
 :root[data-theme="dark"] .rates-chg.up { color: #fbbf24; }
 :root[data-theme="dark"] .rates-chg.down { color: #4ade80; }
-/* ---------- sport ---------- */
+/* ---------- sport: classic left-right scoreboard, crest above each name ---------- */
 .sport { padding: 16px 20px; display: grid; gap: 10px; align-content: start; }
 .sport-note { margin: 0; }
-.sport-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.sport-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 12px; align-items: center; }
-.sport-crest { width: 32px; height: 32px; object-fit: contain; }
-.sport-text { display: grid; gap: 2px; min-width: 0; }
-.sport-main { font-weight: 700; line-height: 1.25; }
-.sport-vs { color: var(--muted); font-weight: 400; }
-.sport-score { font-variant-numeric: tabular-nums; padding: 0 2px; }
-.sport-sub { color: var(--muted); font-size: .9em; }
-.sport-live { color: var(--accent); font-weight: 800; }
+.sport-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.match { display: grid; gap: 6px; padding: 10px 0; }
+.match + .match { border-top: 1px solid var(--line); }
+.match:first-child { padding-top: 2px; }
+.match-meta { color: var(--muted); font-size: .82em; text-align: center; }
+.match-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 8px; }
+.match-row-single { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.match-side { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; }
+.match-row-single .match-side { grid-auto-flow: column; justify-content: start; gap: 10px; }
+.match-name { font-size: .92em; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; max-width: 100%; }
+.match-side.followed .match-name { font-weight: 700; }
+.match-mid { display: grid; justify-items: center; align-content: center; min-height: 34px; padding-top: 4px; white-space: nowrap; }
+.match-mid b { font-size: 1.3em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.match-mid small { color: var(--muted); font-size: .8em; }
+.sport-crest { width: 34px; height: 34px; object-fit: contain; }
+.sport-live, .match-mid .sport-live { color: var(--accent); font-weight: 800; }
 /* ---------- weather (follows the theme) ---------- */
 .weather { display: grid; gap: 12px; padding: 18px 20px 14px; }
 .weather-empty { min-height: 120px; }

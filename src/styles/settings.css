@@ -18,21 +18,22 @@
 .swatch { width: var(--tap); height: var(--tap); border-radius: 50%; border: 3px solid transparent; padding: 0; }
 .swatch[aria-pressed="true"] { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
 /* swatch colours mirror the accent tokens in base.css: light first, then the dark overrides */
-.swatch[data-accent="blue"] { background: #2f6bea; }
-.swatch[data-accent="teal"] { background: #0e8577; }
-.swatch[data-accent="green"] { background: #277a4d; }
-.swatch[data-accent="amber"] { background: #9c610b; }
-.swatch[data-accent="coral"] { background: #c4432c; }
-.swatch[data-accent="violet"] { background: #7557d6; }
-:root[data-theme="dark"] .swatch[data-accent="blue"] { background: #7da3ff; }
-:root[data-theme="dark"] .swatch[data-accent="teal"] { background: #4fd1c0; }
-:root[data-theme="dark"] .swatch[data-accent="green"] { background: #72d39c; }
-:root[data-theme="dark"] .swatch[data-accent="amber"] { background: #f2b84f; }
-:root[data-theme="dark"] .swatch[data-accent="coral"] { background: #ff8f78; }
-:root[data-theme="dark"] .swatch[data-accent="violet"] { background: #b4a0ff; }
+.swatch[data-accent="blue"] { background: #24518f; }
+.swatch[data-accent="teal"] { background: #1b6873; }
+.swatch[data-accent="green"] { background: #2e6a45; }
+.swatch[data-accent="amber"] { background: #87601a; }
+.swatch[data-accent="coral"] { background: #8c2c3c; }
+.swatch[data-accent="violet"] { background: #6b3f7d; }
+:root[data-theme="dark"] .swatch[data-accent="blue"] { background: #24518f; }
+:root[data-theme="dark"] .swatch[data-accent="teal"] { background: #1b6873; }
+:root[data-theme="dark"] .swatch[data-accent="green"] { background: #2e6a45; }
+:root[data-theme="dark"] .swatch[data-accent="amber"] { background: #87601a; }
+:root[data-theme="dark"] .swatch[data-accent="coral"] { background: #8c2c3c; }
+:root[data-theme="dark"] .swatch[data-accent="violet"] { background: #6b3f7d; }
 /* the whole row toggles; a divider only between consecutive rows (-14px cancels the .section/.stack gap, keep in step) */
 .toggle-row { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 0; cursor: pointer; }
-.toggle-row + .toggle-row { border-top: 1px solid var(--line); margin-top: -14px; }
+/* every switch row after the first gets a divider with room above it, also when a field sits in between */
+.section > .toggle-row ~ .toggle-row { border-top: 1px solid var(--line); padding-top: 12px; }
 .toggle-row .grow { flex: 1; min-width: 0; }
 .toggle-row small { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch { position: relative; width: 52px; height: 32px; flex: 0 0 auto; border-radius: 999px; border: 0; background: var(--switch-off, var(--chip)); transition: background .15s; }
@@ -80,9 +81,20 @@
 .look-preview > small { font-size: 1em; font-weight: 600; color: var(--fg); }
 .look-preview .preview { pointer-events: none; }
 .look-preview .card { border: 1px solid var(--line); }
-.look-preview .grid.preview { grid-template-columns: 1fr; }
+/* the preview is hidden on phones (responsive.css); in magazine the lead plus one row of two fills the frame */
+.preview-frame { overflow: hidden; }
+.magazine.preview .article:nth-child(n+4) { display: none; }
+/* in the preview the magazine lead is a wider, taller card, image on top like the two below it */
+.look-preview .magazine .article.lead { flex-direction: column; }
+.look-preview .magazine .article.lead .article-img { width: 100%; aspect-ratio: 21 / 9; }
+.look-preview .magazine .article.lead .article-body { padding: 14px 16px 8px; justify-content: flex-start; }
+.look-preview .magazine .article.lead .article-title { font-size: 1.35em; }
+.look-preview .magazine .article.lead .article-foot { margin-top: auto; }
+.preview-img[data-hue="1"] { filter: hue-rotate(45deg); }
+.preview-img[data-hue="2"] { filter: hue-rotate(-40deg) saturate(.8); }
+.preview-img[data-hue="3"] { filter: hue-rotate(90deg) saturate(.7); }
 @media (min-width: 720px) {
-  .look-grid { grid-template-columns: minmax(0, 1fr) min(300px, 36%); }
+  .look-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .look-preview { position: sticky; top: 90px; align-self: start; }
 }
 .preview-img { aspect-ratio: 16 / 9; background: var(--accent-soft); }

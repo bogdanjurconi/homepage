@@ -81,7 +81,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
         )}
       </section>
 
-      <SearchBar engine={profile.search_engine} t={t} />
+      {profile.show_search && <SearchBar engine={profile.search_engine} t={t} />}
       <QuickLinks links={links} label={t('links.title')} />
 
       {showSideWidgets && (

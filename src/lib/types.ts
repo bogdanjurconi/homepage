@@ -27,6 +27,7 @@ export interface Profile {
   search_engine: SearchEngine
   show_rates: boolean
   show_calendar: boolean
+  show_search: boolean
   open_in_reader: boolean
   is_admin: boolean
   has_password: boolean
@@ -50,6 +51,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   search_engine: 'google',
   show_rates: true,
   show_calendar: true,
+  show_search: true,
   open_in_reader: false,
   is_admin: false,
   has_password: false,

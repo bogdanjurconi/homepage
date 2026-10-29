@@ -5,7 +5,15 @@ import type { Language, SportMatch, SportResponse, Team } from '../lib/types'
 
 const CACHE_KEY = 'homepage.sport'
 const LIVE_POLL_MS = 60_000
-const IDLE_MS = 5 * 60_000
+const IDLE_MS = 30 * 60_000
+
+// Without a match on, the next useful moment is the earliest kick-off (or half an hour, whichever comes first).
+function nextPoll(d: SportResponse): number {
+  if (d.teams.some((x) => x.live)) return LIVE_POLL_MS
+  const kickoffs = d.teams.map((x) => x.next && Date.parse(x.next.utcDate) - Date.now()).filter((ms): ms is number => typeof ms === 'number')
+  const soonest = Math.min(IDLE_MS, ...kickoffs)
+  return Math.max(LIVE_POLL_MS, soonest)
+}
 
 function readCache(ids: number[]): SportResponse | null {
   try {
@@ -30,74 +38,87 @@ export default function SportCard({ teams, lang, t }: { teams: Team[]; lang: Lan
       if (e || !d || !d.teams) { setError(true); return }
       setError(false); setData(d)
       sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ids: key, data: d }))
-      // While a match is on, ask again every minute; otherwise every few minutes is plenty.
-      timer = window.setTimeout(load, d.teams.some((x) => x.live) ? LIVE_POLL_MS : IDLE_MS)
+      // Every minute while a match is on; otherwise at the next kick-off, at most half an hour later.
+      timer = window.setTimeout(load, nextPoll(d))
     }
     const cached = readCache(ids)
     const age = cached ? Date.now() - Date.parse(cached.at) : Infinity
-    timer = window.setTimeout(load, cached && age < LIVE_POLL_MS ? LIVE_POLL_MS - age : 0)
+    timer = window.setTimeout(load, cached && age < nextPoll(cached) ? nextPoll(cached) - age : 0)
     return () => { cancelled = true; window.clearTimeout(timer) }
   }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!teams.length) return null
+  // One block per followed team; two teams playing each other share one block.
+  const seen = new Set<number>()
   return (
     <section className="card sport" aria-label={t('sport.title')}>
       <b>{t('sport.title')}</b>
       {error && !data && <p className="muted sport-note">{t('sport.error')}</p>}
-      <ul className="sport-list">
-        {teams.map((team) => {
-          const s = data?.teams.find((x) => x.team.id === team.id)
-          const m = s?.live ?? s?.next ?? s?.last ?? null
-          return (
-            <li key={team.id} className="sport-row">
-              {team.crest ? <img className="sport-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="sport-crest" />}
-              <div className="sport-text">
-                {!data && !error && <span className="muted">…</span>}
-                {data && !m && <><span className="sport-main">{team.name}</span><span className="sport-sub">{t(s?.error ? 'sport.error' : 'sport.noMatch')}</span></>}
-                {m && <MatchLine m={m} kind={s?.live ? 'live' : s?.next ? 'next' : 'last'} teamId={team.id} lang={lang} t={t} />}
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+      {!data && !error && <p className="muted sport-note">…</p>}
+      {data && (
+        <ul className="sport-list">
+          {[...teams].sort((a, b) => order(data, a.id) - order(data, b.id)).map((team) => {
+            const s = data.teams.find((x) => x.team.id === team.id)
+            const m = s?.live ?? s?.next ?? s?.last ?? null
+            if (m && seen.has(m.id)) return null
+            if (m) seen.add(m.id)
+            if (!m) return (
+              <li key={team.id} className="match">
+                <div className="match-row match-row-single">
+                  <TeamSide side={{ id: team.id, name: team.name, shortName: null, tla: team.tla, crest: team.crest }} followed />
+                  <div className="match-mid"><small>{t(s?.error ? 'sport.error' : 'sport.noMatch')}</small></div>
+                </div>
+              </li>
+            )
+            const kind = s?.live ? 'live' : s?.next ? 'next' : 'last'
+            const followed = new Set(teams.map((x) => x.id))
+            const score = `${m.score.home ?? 0} – ${m.score.away ?? 0}`
+            return (
+              <li key={team.id} className="match">
+                <div className="match-meta">{kind === 'next' ? `${dayOf(m.utcDate, lang, t)} · ` : ''}{m.competition.name}</div>
+                <div className="match-row">
+                  <TeamSide side={m.home} followed={followed.has(m.home.id)} />
+                  <div className="match-mid">
+                    {kind === 'next' && <><b>{timeOf(m.utcDate, lang)}</b>{m.status === 'POSTPONED' && <small>{t('sport.postponed')}</small>}</>}
+                    {kind === 'live' && <><b>{score}</b><small className="sport-live">{m.status === 'PAUSED' ? t('sport.halfTime') : m.minute != null ? `${m.minute}'` : t('sport.live')}</small></>}
+                    {kind === 'last' && <><b>{score}</b><small>{t('sport.finished')}</small></>}
+                  </div>
+                  <TeamSide side={m.away} followed={followed.has(m.away.id)} />
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </section>
   )
 }
 
-function MatchLine({ m, kind, teamId, lang, t }: { m: SportMatch; kind: 'live' | 'next' | 'last'; teamId: number; lang: Language; t: T }) {
-  const home = m.home.shortName ?? m.home.name, away = m.away.shortName ?? m.away.name
-  const when = formatWhen(m.utcDate, lang, t)
-  if (kind === 'next') {
-    const us = m.home.id === teamId, them = us ? away : home
-    return (
-      <>
-        <span className="sport-main">{us ? home : away} <span className="sport-vs">{t('sport.vs')}</span> {them}</span>
-        <span className="sport-sub">{when} · {m.competition.name}{m.status === 'POSTPONED' ? ` · ${t('sport.postponed')}` : ''}</span>
-      </>
-    )
-  }
-  const score = `${m.score.home ?? 0} – ${m.score.away ?? 0}`
+// Live matches first, then upcoming ones by kick-off, then the last results, then teams with nothing on.
+function order(data: SportResponse, id: number): number {
+  const s = data.teams.find((x) => x.team.id === id)
+  if (s?.live) return 0
+  if (s?.next) return 1 + Date.parse(s.next.utcDate) / 1e13
+  if (s?.last) return 3 - Date.parse(s.last.utcDate) / 1e13
+  return 4
+}
+
+function TeamSide({ side, followed }: { side: SportMatch['home']; followed: boolean }) {
   return (
-    <>
-      <span className="sport-main">{home} <span className="sport-score">{score}</span> {away}</span>
-      <span className="sport-sub">
-        {kind === 'live'
-          ? <span className="sport-live">{m.status === 'PAUSED' ? t('sport.halfTime') : m.minute != null ? `${m.minute}'` : t('sport.live')}</span>
-          : <span>{t('sport.finished')} · {when}</span>}
-        {' · '}{m.competition.name}
-      </span>
-    </>
+    <div className={`match-side${followed ? ' followed' : ''}`}>
+      {side.crest ? <img className="sport-crest" src={side.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="sport-crest" />}
+      <span className="match-name">{side.shortName ?? side.name}</span>
+    </div>
   )
 }
 
-// "Azi 21:45", "Mâine 18:00", "Sâm. 7 nov., 21:45"
-function formatWhen(iso: string, lang: Language, t: T): string {
-  const d = new Date(iso)
-  const time = new Intl.DateTimeFormat(lang, { hour: '2-digit', minute: '2-digit' }).format(d)
-  const day = (x: Date) => x.toDateString()
-  const now = new Date(), tomorrow = new Date(now.getTime() + 86_400_000)
-  if (day(d) === day(now)) return `${t('weather.today')} ${time}`
-  if (day(d) === day(tomorrow)) return `${t('weather.tomorrow')} ${time}`
+const timeOf = (iso: string, lang: Language) => new Intl.DateTimeFormat(lang, { hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
+
+// "Azi", "Mâine", "Sâm., 31 oct."
+function dayOf(iso: string, lang: Language, t: T): string {
+  const d = new Date(iso), now = new Date(), tomorrow = new Date(now.getTime() + 86_400_000)
+  if (d.toDateString() === now.toDateString()) return t('weather.today')
+  if (d.toDateString() === tomorrow.toDateString()) return t('weather.tomorrow')
   const date = new Intl.DateTimeFormat(lang, { weekday: 'short', day: 'numeric', month: 'short' }).format(d)
-  return `${date.charAt(0).toUpperCase()}${date.slice(1)}, ${time}`
+  return date.charAt(0).toUpperCase() + date.slice(1)
 }

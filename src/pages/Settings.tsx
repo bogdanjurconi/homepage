@@ -150,10 +150,13 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
             </Field>
           )}
           <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
+          <Toggle label={t('settings.showSearch')} on={profile.show_search} onChange={(v) => update({ show_search: v })} />
+          {profile.show_search && (
+            <Field label={t('settings.searchEngine')}>
+              <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
+            </Field>
+          )}
           <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
-          <Field label={t('settings.searchEngine')}>
-            <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
-          </Field>
         </Section>
 
         <Section id="links" ref={reg('links')} title={t('links.title')} desc={t('settings.linksDesc')}>
@@ -249,23 +252,48 @@ function LayoutGlyph({ layout }: { layout: Layout }) {
   )
 }
 
+// A small news page in the chosen layout, drawn at a desktop-like width and zoomed to fit the column, so cards, magazine and list look as they will on the front page.
+const PREVIEW_WIDTH = 640
+const PREVIEW_ITEMS: { title: Key; summary: Key; source: string; hue: number }[] = [
+  { title: 'settings.previewTitle', summary: 'settings.previewSummary', source: 'Digi24', hue: 0 },
+  { title: 'settings.previewTitle2', summary: 'settings.previewSummary2', source: 'HotNews', hue: 1 },
+  { title: 'settings.previewTitle3', summary: 'settings.previewSummary3', source: 'Ars Technica', hue: 2 },
+  { title: 'settings.previewTitle4', summary: 'settings.previewSummary4', source: 'GSMArena', hue: 3 },
+]
+
 function Preview({ t, layout, showSummary }: { t: T; layout: Layout; showSummary: boolean }) {
+  const frame = useRef<HTMLDivElement>(null)
+  const [zoom, setZoom] = useState(1)
+  useEffect(() => {
+    const el = frame.current
+    if (!el) return
+    const fit = () => setZoom(Math.min(1, el.clientWidth / PREVIEW_WIDTH))
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const cls = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : 'grid'
   return (
-    <div className={layout === 'list' ? 'list preview' : 'grid preview'}>
-      <article className="card article">
-        {layout !== 'list' && <div className="article-img preview-img" aria-hidden="true" />}
-        <div className="article-body">
-          <h3 className="article-title">{t('settings.previewTitle')}</h3>
-          {showSummary && <p className="article-sum">{t('settings.previewSummary')}</p>}
-          <div className="article-foot">
-            <div className="article-src"><b>{t('settings.previewSource')}</b><span>·</span><span>{t('time.now')}</span></div>
-            <div className="article-actions">
-              <span className="icon-btn"><BookIcon /></span>
-              <span className="icon-btn" aria-pressed="true"><StarIcon filled /></span>
+    <div className="preview-frame" ref={frame}>
+      <div className={`${cls} preview`} style={zoom < 1 ? { width: PREVIEW_WIDTH, zoom } : undefined}>
+        {PREVIEW_ITEMS.map((item, i) => (
+          <article key={item.title} className={`card article${layout === 'magazine' && i === 0 ? ' lead' : ''}`}>
+            <div className="article-img preview-img" data-hue={item.hue} aria-hidden="true" />
+            <div className="article-body">
+              <h3 className="article-title">{t(item.title)}</h3>
+              {showSummary && <p className="article-sum">{t(item.summary)}</p>}
+              <div className="article-foot">
+                <div className="article-src"><b>{item.source}</b><span>·</span><span>{t('time.now')}</span></div>
+                <div className="article-actions">
+                  <span className="icon-btn"><BookIcon /></span>
+                  <span className="icon-btn" aria-pressed={i === 0 ? 'true' : undefined}><StarIcon filled={i === 0} /></span>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </article>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }

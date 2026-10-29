@@ -5,6 +5,13 @@ import { takePendingLanguage } from '../lib/guestLanguage'
 
 const CACHE_KEY = 'homepage.profile'
 
+// The browser-tab icon follows the chosen accent and theme (same drawing as public/icon.svg and BrandIcon).
+function setFavicon(bg: string, fg: string) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${bg}"/><path d="M11 34.5V25.5L32 10.5 53 25.5V34.5" fill="none" stroke="${fg}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 44h28M18 54h17" fill="none" stroke="${fg}" stroke-width="6" stroke-linecap="round"/></svg>`
+  const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (link) link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 function readCache(userId: string): Profile | null {
   try {
     const raw = localStorage.getItem(CACHE_KEY)
@@ -77,8 +84,11 @@ export function useProfile(userId: string | undefined) {
       root.dataset.font = p.font
       root.dataset.bg = p.background
       // The Android address bar follows the page background, paper variant included.
-      const bg = getComputedStyle(root).getPropertyValue('--bg').trim()
+      const css = getComputedStyle(root)
+      const bg = css.getPropertyValue('--bg').trim()
       if (bg) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg)
+      const accent = css.getPropertyValue('--accent').trim(), accentFg = css.getPropertyValue('--accent-fg').trim()
+      if (accent && accentFg) setFavicon(accent, accentFg)
     }
     apply()
     mq.addEventListener('change', apply)
