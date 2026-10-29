@@ -13,7 +13,12 @@
         var d = document.documentElement.dataset;
         var dark = p.theme === 'dark' || (p.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
         d.theme = dark ? 'dark' : 'light';
-        if (p.accent) d.accent = p.accent;
+        if (p.accent && p.accent.charAt(0) === '#') {
+          // a picked colour: its tokens were worked out by the app (lib/accent.ts) and cached per theme
+          d.accent = 'custom';
+          var v = (JSON.parse(localStorage.getItem('homepage.accent') || 'null') || {})[dark ? 'dark' : 'light'] || {};
+          for (var k in v) document.documentElement.style.setProperty(k, v[k]);
+        } else if (p.accent) d.accent = p.accent;
         if (p.text_size) d.size = p.text_size;
         if (p.font) d.font = p.font;
         if (p.background) d.bg = p.background;

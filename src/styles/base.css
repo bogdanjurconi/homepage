@@ -131,7 +131,14 @@ h2 { font-size: 1.2em; margin: 0; }
 :root[data-bg="paper"] { --bg: #f4eee4; --card: #fffbf4; --line: #e6dccb; --chip: #ece3d4; --hover: #f3ecdf; }
 :root[data-theme="dark"][data-bg="paper"] { --bg: #16130e; --card: #211d15; --line: #3a3327; --chip: #2b261c; --hover: #2a251b; }
 :root[data-bg="tinted"] body { background: var(--bg); }
+/* the tint is a fixed layer behind the page, so it stays at the top while scrolling; phones ignore
+   background-attachment: fixed, a fixed element works everywhere and costs one composited layer */
 @supports (color: color-mix(in srgb, red, blue)) {
-  :root[data-bg="tinted"] body { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 16%, var(--bg)) 0, var(--bg) 480px) fixed; }
+  /* the accent mixed into the page colour at the top; the header uses the same shade */
+  :root[data-bg="tinted"] { --tint: color-mix(in srgb, var(--accent) 24%, var(--bg)); }
+  :root[data-bg="tinted"] body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(180deg, var(--tint) 0, var(--bg) 640px); }
+  /* the header takes the tint's top colour, so it blends in at rest and still hides the cards scrolling under it */
+  :root[data-bg="tinted"] .header { background: color-mix(in srgb, var(--tint) 90%, transparent); }
 }
-:root[data-bg="tinted"] .header { background: transparent; border-bottom-color: transparent; }
+:root[data-bg="tinted"] .header { border-bottom-color: transparent; }

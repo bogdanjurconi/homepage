@@ -17,6 +17,13 @@
 .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
 .swatch { width: var(--tap); height: var(--tap); border-radius: 50%; border: 3px solid transparent; padding: 0; }
 .swatch[aria-pressed="true"] { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
+/* the picker swatch: a colour wheel, with the picked colour in its middle once there is one */
+/* border-box origin: the wheel fills the circle once instead of tiling into the transparent border as a square seam */
+.swatch.custom { position: relative; cursor: pointer; background: conic-gradient(#d33, #d93, #cc3, #3a5, #39c, #36c, #93c, #d33) border-box; }
+.swatch.custom[style] { background: radial-gradient(var(--picked) 0 44%, transparent 46%) border-box, conic-gradient(#d33, #d93, #cc3, #3a5, #39c, #36c, #93c, #d33) border-box; }
+.swatch.custom.on { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
+/* a ring for keyboard focus only: after the picker closes the input keeps focus, and the selection ring is enough */
+.swatch.custom:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
 /* swatch colours mirror the accent tokens in base.css: light first, then the dark overrides */
 .swatch[data-accent="blue"] { background: #24518f; }
 .swatch[data-accent="teal"] { background: #1b6873; }
@@ -35,6 +42,7 @@
 /* every switch row after the first gets a divider with room above it, also when a field sits in between */
 .section > .toggle-row ~ .toggle-row { border-top: 1px solid var(--line); padding-top: 12px; }
 .toggle-row .grow { flex: 1; min-width: 0; }
+.toggle-row[aria-disabled="true"] { cursor: default; opacity: .5; }
 .toggle-row small { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch { position: relative; width: 52px; height: 32px; flex: 0 0 auto; border-radius: 999px; border: 0; background: var(--switch-off, var(--chip)); transition: background .15s; }
 .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .15s; }
@@ -84,6 +92,8 @@
 /* the preview is hidden on phones (responsive.css); in magazine the lead plus one row of two fills the frame */
 .preview-frame { overflow: hidden; }
 .magazine.preview .article:nth-child(n+4) { display: none; }
+/* the page's magazine allows three columns from 340px; the 640px preview keeps its two, as before */
+.look-preview .magazine { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* in the preview the magazine lead is a wider, taller card, image on top like the two below it */
 .look-preview .magazine .article.lead { flex-direction: column; }
 .look-preview .magazine .article.lead .article-img { width: 100%; aspect-ratio: 21 / 9; }
@@ -144,3 +154,5 @@
   .seg-small button { padding: 0 10px; }
   .src-card { gap: 6px; padding: 10px 8px 10px 12px; }
 }
+/* weather and sport: what is chosen, then one search field with its results, in one column of a comfortable width */
+.picker { max-width: 560px; }

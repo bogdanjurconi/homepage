@@ -4,11 +4,14 @@ export type TextSize = 'small' | 'normal' | 'large'
 export type Layout = 'list' | 'cards' | 'magazine'
 export type Font = 'system' | 'serif' | 'rounded'
 export type Background = 'flat' | 'tinted' | 'paper'
-export type Accent = 'blue' | 'teal' | 'green' | 'amber' | 'coral' | 'violet'
+export type PresetAccent = 'blue' | 'teal' | 'green' | 'amber' | 'coral' | 'violet'
+// A preset name, or a colour the person picked ("#rrggbb"), see lib/accent.ts
+export type Accent = PresetAccent | `#${string}`
 export type SearchEngine = 'google' | 'brave'
 
-export const ACCENTS: Accent[] = ['blue', 'teal', 'green', 'amber', 'coral', 'violet']
+export const ACCENTS: PresetAccent[] = ['blue', 'teal', 'green', 'amber', 'coral', 'violet']
 export const LAYOUTS: Layout[] = ['cards', 'magazine', 'list']
+
 export const FONTS: Font[] = ['system', 'serif', 'rounded']
 export const BACKGROUNDS: Background[] = ['flat', 'tinted', 'paper']
 export const TEXT_SIZES: TextSize[] = ['small', 'normal', 'large']
@@ -20,6 +23,8 @@ export interface Profile {
   language: Language
   theme: Theme
   accent: Accent
+  // the last colour picked for the custom swatch, kept while a preset is in use
+  accent_custom: string | null
   text_size: TextSize
   layout: Layout
   font: Font
@@ -44,6 +49,7 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   language: 'en',
   theme: 'auto',
   accent: 'blue',
+  accent_custom: null,
   text_size: 'normal',
   layout: 'cards',
   font: 'system',

@@ -7,6 +7,8 @@ import { FEED_CACHE_KEY, readFeedCache, type CachedFeed } from '../lib/feedCache
 import { useSaved } from '../hooks/useSaved'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { usePaged } from '../hooks/usePaged'
+import { mixSources, pickLeads } from '../lib/mix'
+import { useMedia } from '../hooks/useMedia'
 import ArticleCard from '../components/ArticleCard'
 import WeatherCard from '../components/WeatherCard'
 import RatesCard from '../components/RatesCard'
@@ -24,6 +26,8 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
   const [loading, setLoading] = useState(!data)
   const [error, setError] = useState(false)
   const [section, setSection] = useState<Category | 'all'>('all')
+  // Same breakpoint as the one-column CSS: below it the phone layout applies.
+  const phone = useMedia('(max-width: 719px)')
   const [query, setQuery] = useState('')
   const { savedIds, toggle } = useSaved(userId)
   const { links } = useQuickLinks(userId)
@@ -50,13 +54,18 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
     return CATEGORY_ORDER.filter((c) => present.has(c))
   }, [data])
 
-  const items: FeedItem[] = useMemo(() => {
+  // Phones show one column, where the magazine would only be cards with a bigger title: they get the cards.
+  const layout = phone && profile.layout === 'magazine' ? 'cards' : profile.layout
+  const layoutClass = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : 'grid'
+  const { items, leads } = useMemo<{ items: FeedItem[]; leads: Set<string> }>(() => {
     let all = data?.items ?? []
     if (section !== 'all') all = all.filter((i) => sourceByUrl.get(i.feed_url)?.category === section)
     const q = fold(query.trim())
     if (q) all = all.filter((i) => fold(`${i.title} ${i.summary ?? ''} ${sourceName(i.feed_url)}`).includes(q))
-    return all
-  }, [data, section, query, sourceByUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+    // A busy source may not crowd out the quiet ones; the magazine then chooses its large stories.
+    const mixed = mixSources(all)
+    return layout === 'magazine' ? pickLeads(mixed) : { items: mixed, leads: new Set<string>() }
+  }, [data, section, query, sourceByUrl, layout]) // eslint-disable-line react-hooks/exhaustive-deps
   // Cards are rendered a page at a time; the rest follow as the reader scrolls. A refresh keeps the
   // depth already revealed, so a background update never pulls the list away from under the reader.
   const { shown, hasMore, more, sentinel } = usePaged(items, `${section}|${query}`)
@@ -66,7 +75,6 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
   const hour = new Date().getHours()
   const greeting = t(hour < 5 ? 'greeting.night' : hour < 12 ? 'greeting.morning' : hour < 18 ? 'greeting.day' : 'greeting.evening')
   const today = new Intl.DateTimeFormat(profile.language, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
-  const layoutClass = profile.layout === 'list' ? 'list' : profile.layout === 'magazine' ? 'magazine' : 'grid'
   const showSideWidgets = profile.show_rates || profile.show_calendar || profile.teams.length > 0
 
   return (
@@ -126,10 +134,10 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       )}
 
       <div className={layoutClass}>
-        {shown.map((item, i) => (
+        {shown.map((item) => (
           <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t}
-            saved={savedIds.has(item.id)} onToggleSave={toggle} showImage={profile.layout !== 'list'} openInReader={profile.open_in_reader} showSummary={profile.show_summary}
-            className={profile.layout === 'magazine' && i === 0 && !!item.image_url ? 'lead' : undefined} />
+            saved={savedIds.has(item.id)} onToggleSave={toggle} showImage compact={layout === 'list'} openInReader={profile.open_in_reader} showSummary={profile.show_summary}
+            className={leads.has(item.id) ? 'lead' : undefined} />
         ))}
       </div>
       {hasMore && (

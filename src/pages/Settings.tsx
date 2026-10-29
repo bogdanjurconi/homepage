@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { customAccentVars, isCustomAccent } from '../lib/accent'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
 import {
@@ -91,6 +92,7 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
                     <button key={a} type="button" className="swatch" data-accent={a} aria-pressed={profile.accent === a}
                       aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
                   ))}
+                  <CustomSwatch t={t} accent={profile.accent} saved={profile.accent_custom} onPick={(hex) => update({ accent: hex as `#${string}`, accent_custom: hex })} />
                 </div>
               </Field>
               <Field label={t('settings.layout')}>
@@ -102,7 +104,8 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
                   ))}
                 </div>
               </Field>
-              <Toggle label={t('settings.showSummary')} on={profile.show_summary} onChange={(v) => update({ show_summary: v })} />
+              {/* the compact list never shows summaries: the switch reads off and rests, the saved choice is kept for the other layouts */}
+              <Toggle label={t('settings.showSummary')} on={profile.show_summary && profile.layout !== 'list'} disabled={profile.layout === 'list'} onChange={(v) => update({ show_summary: v })} />
               <Field label={t('settings.font')}>
                 <div className="option-cards">
                   {FONTS.map((f) => (
@@ -223,11 +226,39 @@ function Segmented<V extends string>({ value, options, onChange }: { value: V; o
   )
 }
 
-function Toggle({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string }) {
+// The last swatch holds the person's own colour. While a preset is chosen, a tap brings that colour
+// back; once it is the chosen one, a tap opens the system colour picker to change it. Dragging in the
+// picker fires many changes: the page follows each one at once, and only the colour it settles on is saved.
+function CustomSwatch({ t, accent, saved, onPick }: { t: T; accent: string; saved: string | null; onPick: (hex: string) => void }) {
+  const active = isCustomAccent(accent)
+  const [live, setLive] = useState<string | null>(null)
+  const timer = useRef<number | undefined>(undefined)
+  const shown = live ?? (active ? accent : saved)
+  const style = shown ? ({ '--picked': shown } as React.CSSProperties) : undefined
+  const pick = (hex: string) => {
+    setLive(hex)
+    const root = document.documentElement
+    const vars = customAccentVars(hex, root.dataset.theme === 'dark')
+    root.dataset.accent = 'custom'
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => { onPick(hex); setLive(null) }, 500)
+  }
+  if (!active && live == null && saved) return (
+    <button type="button" className="swatch custom" aria-pressed={false} aria-label={t('accent.custom')} title={t('accent.custom')} style={style} onClick={() => onPick(saved)} />
+  )
   return (
-    <div className="toggle-row" onClick={() => onChange(!on)}>
+    <label className={`swatch custom${active || live != null ? ' on' : ''}`} title={t('accent.custom')} style={style}>
+      <input type="color" className="visually-hidden" aria-label={t('accent.custom')} value={shown ?? '#24518f'} onChange={(e) => pick(e.target.value)} />
+    </label>
+  )
+}
+
+function Toggle({ label, on, onChange, hint, disabled }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string; disabled?: boolean }) {
+  return (
+    <div className="toggle-row" aria-disabled={disabled || undefined} onClick={() => { if (!disabled) onChange(!on) }}>
       <div className="grow">{label}{hint && <small>{hint}</small>}</div>
-      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} onClick={(e) => { e.stopPropagation(); onChange(!on) }} />
+      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={(e) => { e.stopPropagation(); onChange(!on) }} />
     </div>
   )
 }
@@ -274,22 +305,25 @@ function Preview({ t, layout, showSummary }: { t: T; layout: Layout; showSummary
     return () => ro.disconnect()
   }, [])
   const cls = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : 'grid'
+  const src = (item: typeof PREVIEW_ITEMS[number]) => <div className="article-src"><b>{item.source}</b><span>·</span><span>{t('time.now')}</span></div>
+  const actions = (i: number) => (
+    <div className="article-actions">
+      <span className="icon-btn"><BookIcon /></span>
+      <span className="icon-btn" aria-pressed={i === 0 ? 'true' : undefined}><StarIcon filled={i === 0} /></span>
+    </div>
+  )
   return (
     <div className="preview-frame" ref={frame}>
       <div className={`${cls} preview`} style={zoom < 1 ? { width: PREVIEW_WIDTH, zoom } : undefined}>
         {PREVIEW_ITEMS.map((item, i) => (
           <article key={item.title} className={`card article${layout === 'magazine' && i === 0 ? ' lead' : ''}`}>
-            <div className="article-img preview-img" data-hue={item.hue} aria-hidden="true" />
+            {layout === 'list'
+              ? <div className="article-media"><div className="article-img preview-img" data-hue={item.hue} aria-hidden="true" />{src(item)}{actions(i)}</div>
+              : <div className="article-img preview-img" data-hue={item.hue} aria-hidden="true" />}
             <div className="article-body">
               <h3 className="article-title">{t(item.title)}</h3>
               {showSummary && <p className="article-sum">{t(item.summary)}</p>}
-              <div className="article-foot">
-                <div className="article-src"><b>{item.source}</b><span>·</span><span>{t('time.now')}</span></div>
-                <div className="article-actions">
-                  <span className="icon-btn"><BookIcon /></span>
-                  <span className="icon-btn" aria-pressed={i === 0 ? 'true' : undefined}><StarIcon filled={i === 0} /></span>
-                </div>
-              </div>
+              <div className="article-foot">{src(item)}{actions(i)}</div>
             </div>
           </article>
         ))}
@@ -515,46 +549,46 @@ type Geo = { id: number; name: string; latitude: number; longitude: number; coun
 function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props['update'] }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Geo[] | null>(null)
-  const [busy, setBusy] = useState(false)
 
-  async function search(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=${profile.language}&format=json`)
-      const json = await res.json()
-      setResults((json.results as Geo[]) ?? [])
-    } catch { setResults([]) } finally { setBusy(false) }
-  }
+  // Searches as the person types, like the team search: a short pause, and only the latest answer counts.
+  useEffect(() => {
+    const name = q.trim()
+    if (name.length < 2) return
+    const ctrl = new AbortController()
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=6&language=${profile.language}&format=json`, { signal: ctrl.signal })
+        const json = await res.json()
+        setResults((json.results as Geo[]) ?? [])
+      } catch { if (!ctrl.signal.aborted) setResults([]) }
+    }, 350)
+    return () => { window.clearTimeout(timer); ctrl.abort() }
+  }, [q, profile.language])
 
+  // Results show only while there is something to search for; picking a city clears the field.
+  const shown = q.trim().length >= 2 ? results : null
   return (
-    <div className="two-col">
-      <div className="stack">
-        {profile.weather_city ? (
-          <div className="src-card">
-            <WeatherIcon code={0} className="src-icon" />
-            <div className="grow"><b>{profile.weather_city}</b></div>
-            <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
-              onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
-          </div>
-        ) : <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>}
-      </div>
-      <div className="stack">
-        <form className="row" onSubmit={search}>
-          <input className="input" style={{ flex: 1 }} type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.weatherCity')} placeholder={t('settings.weatherCity')} value={q} onChange={(e) => setQ(e.target.value)} required />
-          <button className="btn" type="submit" disabled={busy}>{t('settings.weatherSearch')}</button>
-        </form>
-        {results && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
-        {results && results.length > 0 && (
-          <div className="results">
-            {results.map((r) => (
-              <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
-                {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+    <div className="stack picker">
+      {profile.weather_city ? (
+        <div className="src-card">
+          <WeatherIcon code={0} className="src-icon" />
+          <div className="grow"><b>{profile.weather_city}</b></div>
+          <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
+            onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
+        </div>
+      ) : <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>}
+      <input className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.weatherCity')} placeholder={t('settings.weatherCity')}
+        value={q} onChange={(e) => setQ(e.target.value)} />
+      {shown && shown.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
+      {shown && shown.length > 0 && (
+        <div className="results">
+          {shown.map((r) => (
+            <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
+              {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -588,36 +622,32 @@ function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (te
   const full = teams.length >= MAX_TEAMS
 
   return (
-    <div className="two-col">
-      <div className="stack">
-        {teams.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLead')}</p>}
-        {teams.map((team) => (
-          <div key={team.id} className="src-card">
-            {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
-            <div className="grow"><b>{team.name}</b></div>
-            <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
-              onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
-          </div>
-        ))}
-      </div>
-      <div className="stack">
-        {full ? <p className="muted" style={{ margin: 0 }}>{t('settings.sportMax', { n: MAX_TEAMS })}</p> : (
-          <input className="input" type="text" inputMode="search" autoComplete="off" aria-label={t('settings.sportSearch')} placeholder={t('settings.sportSearch')}
-            value={q} onFocus={ensureOptions} onChange={(e) => { setQ(e.target.value); void ensureOptions() }} />
-        )}
-        {state === 'loading' && query && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLoading')}</p>}
-        {state === 'error' && <p className="muted" style={{ margin: 0 }}>{t('settings.sportUnavailable')}</p>}
-        {options && query.length >= 2 && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportNone')}</p>}
-        {results.length > 0 && (
-          <div className="results">
-            {results.map((o) => (
-              <button key={o.id} type="button" onClick={() => { onChange([...teams, { id: o.id, name: o.name, tla: o.tla, crest: o.crest }]); setQ('') }}>
-                {o.name}{o.area ? ` · ${o.area}` : ''}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+    <div className="stack picker">
+      {teams.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLead')}</p>}
+      {teams.map((team) => (
+        <div key={team.id} className="src-card">
+          {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
+          <div className="grow"><b>{team.name}</b></div>
+          <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
+            onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
+        </div>
+      ))}
+      {full ? <p className="muted" style={{ margin: 0 }}>{t('settings.sportMax', { n: MAX_TEAMS })}</p> : (
+        <input className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.sportSearch')} placeholder={t('settings.sportSearch')}
+          value={q} onFocus={ensureOptions} onChange={(e) => { setQ(e.target.value); void ensureOptions() }} />
+      )}
+      {state === 'loading' && query && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLoading')}</p>}
+      {state === 'error' && <p className="muted" style={{ margin: 0 }}>{t('settings.sportUnavailable')}</p>}
+      {options && query.length >= 2 && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportNone')}</p>}
+      {results.length > 0 && (
+        <div className="results">
+          {results.map((o) => (
+            <button key={o.id} type="button" onClick={() => { onChange([...teams, { id: o.id, name: o.name, tla: o.tla, crest: o.crest }]); setQ('') }}>
+              {o.name}{o.area ? ` · ${o.area}` : ''}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

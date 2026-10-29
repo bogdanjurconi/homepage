@@ -2,8 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { DEFAULT_PROFILE, type Profile } from '../lib/types'
 import { takePendingLanguage } from '../lib/guestLanguage'
+import { customAccentVars, isCustomAccent } from '../lib/accent'
 
 const CACHE_KEY = 'homepage.profile'
+// A picked colour's tokens for both themes, read by the inline script in index.html before the first paint.
+const ACCENT_KEY = 'homepage.accent'
 
 // The browser-tab icon follows the chosen accent and theme (same drawing as public/icon.svg and BrandIcon).
 function setFavicon(bg: string, fg: string) {
@@ -79,7 +82,16 @@ export function useProfile(userId: string | undefined) {
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const apply = () => {
       root.dataset.theme = p.theme === 'auto' ? (mq.matches ? 'dark' : 'light') : p.theme
-      root.dataset.accent = p.accent
+      const custom = isCustomAccent(p.accent)
+      root.dataset.accent = custom ? 'custom' : p.accent
+      const vars = custom ? customAccentVars(p.accent, root.dataset.theme === 'dark') : null
+      for (const k of ['--accent', '--accent-fg', '--accent-soft']) {
+        if (vars) root.style.setProperty(k, vars[k]); else root.style.removeProperty(k)
+      }
+      try {
+        if (custom) localStorage.setItem(ACCENT_KEY, JSON.stringify({ light: customAccentVars(p.accent, false), dark: customAccentVars(p.accent, true) }))
+        else localStorage.removeItem(ACCENT_KEY)
+      } catch { /* private mode: the colour still applies once the app loads */ }
       root.dataset.size = p.text_size
       root.dataset.font = p.font
       root.dataset.bg = p.background
