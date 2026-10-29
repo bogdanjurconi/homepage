@@ -1,19 +1,28 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
 import {
   ACCENTS, BACKGROUNDS, CATEGORY_ORDER, FONTS, LAYOUTS, SEARCH_ENGINES, TEXT_SIZES,
-  type Accent, type Account, type Category, type DefaultSource, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource,
+  type Account, type Category, type DefaultSource, type Layout, type Profile, type SearchEngine, type TextSize, type Theme, type UserSource,
 } from '../lib/types'
 import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { CURRENCIES } from '../lib/types'
 import { faviconFor } from '../components/QuickLinks'
 import { StarIcon, BookIcon } from '../components/Icons'
+import WeatherIcon from '../components/WeatherIcon'
 
-type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; userId: string; email: string }
+type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; saveError?: boolean; userId: string; email: string }
 
-const ACCENT_HEX: Record<Accent, string> = { blue: '#2f6bea', teal: '#0e8577', green: '#2f8f5b', amber: '#b9740f', coral: '#d9553d', violet: '#7557d6' }
+// Accepts a bare domain ('digi24.ro') and returns it as a full https:// address, or null when it is not a web address.
+function normalizeUrl(raw: string): string | null {
+  const s = raw.trim()
+  const withScheme = /^https?:\/\//i.test(s) ? s : `https://${s}`
+  try {
+    const u = new URL(withScheme)
+    return /^https?:$/.test(u.protocol) && u.hostname.includes('.') ? withScheme : null
+  } catch { return null }
+}
 
 type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'account' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
@@ -22,18 +31,32 @@ const SECTIONS: { id: SectionId; key: Key }[] = [
   { id: 'invites', key: 'invites.title' },
 ]
 
-export default function Settings({ t, profile, update, saving, userId, email }: Props) {
+export default function Settings({ t, profile, update: persist, saving, saveError, userId, email }: Props) {
   const [active, setActive] = useState<SectionId>('profile')
   const refs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
 
   useEffect(() => {
+    // Track every section in view (the callback only receives the ones that changed) and highlight the topmost.
+    const seen = new Set<SectionId>()
     const obs = new IntersectionObserver((entries) => {
-      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
-      if (visible) setActive(visible.target.id as SectionId)
+      entries.forEach((e) => { const id = e.target.id as SectionId; if (e.isIntersecting) seen.add(id); else seen.delete(id) })
+      const first = SECTIONS.find((s) => seen.has(s.id))
+      if (first) setActive(first.id)
     }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 })
     Object.values(refs.current).forEach((el) => el && obs.observe(el))
     return () => obs.disconnect()
   }, [])
+
+  // "Saved" flashes briefly after each save finishes (the profile hook only exposes `saving`).
+  const [savedFlash, setSavedFlash] = useState(false)
+  const flashTimer = useRef(0)
+  const update = useCallback(async (p: Partial<Omit<Profile, 'id'>>) => {
+    await persist(p)
+    setSavedFlash(true)
+    window.clearTimeout(flashTimer.current)
+    flashTimer.current = window.setTimeout(() => setSavedFlash(false), 1500)
+  }, [persist])
+  useEffect(() => () => window.clearTimeout(flashTimer.current), [])
 
   const jump = (id: SectionId) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
   const reg = (id: SectionId) => (el: HTMLElement | null) => { refs.current[id] = el }
@@ -49,7 +72,7 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
       <div className="settings-main">
         <div className="row">
           <h1 style={{ margin: 0 }}>{t('settings.title')}</h1>
-          <span className="status" aria-live="polite">{saving ? t('settings.saving') : ''}</span>
+          <span className="status" aria-live="polite">{saving ? t('settings.saving') : saveError ? t('error.generic') : savedFlash ? t('settings.saved') : ''}</span>
         </div>
 
         <Section id="profile" ref={reg('profile')} title={t('settings.profile')} desc={t('settings.profileDesc')}>
@@ -63,9 +86,9 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
                 <Segmented<Theme> value={profile.theme} options={[['auto', t('theme.auto')], ['light', t('theme.light')], ['dark', t('theme.dark')]]} onChange={(v) => update({ theme: v })} />
               </Field>
               <Field label={t('settings.accent')}>
-                <div className="swatches" role="radiogroup" aria-label={t('settings.accent')}>
+                <div className="swatches" role="group" aria-label={t('settings.accent')}>
                   {ACCENTS.map((a) => (
-                    <button key={a} type="button" className="swatch" style={{ background: ACCENT_HEX[a] }} aria-pressed={profile.accent === a}
+                    <button key={a} type="button" className="swatch" data-accent={a} aria-pressed={profile.accent === a}
                       aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
                   ))}
                 </div>
@@ -148,8 +171,9 @@ export default function Settings({ t, profile, update, saving, userId, email }: 
         <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
           <div className="two-col">
             <PasswordForm t={t} email={email} hasPassword={profile.has_password} onSet={() => update({ has_password: true })} />
-            <div className="stack" style={{ justifyItems: 'start' }}>
-              <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>{t('settings.signOut')}</button>
+            <div className="stack account-actions">
+              {/* Per-tab caches (feed, links, weather…) carry no user id, so clear them for the next account on a shared device. */}
+              <button type="button" className="btn" onClick={() => { sessionStorage.clear(); void supabase.auth.signOut() }}>{t('settings.signOut')}</button>
             </div>
           </div>
         </Section>
@@ -194,9 +218,9 @@ function Segmented<V extends string>({ value, options, onChange }: { value: V; o
 
 function Toggle({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string }) {
   return (
-    <div className="toggle-row">
+    <div className="toggle-row" onClick={() => onChange(!on)}>
       <div className="grow">{label}{hint && <small>{hint}</small>}</div>
-      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)} />
+      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} onClick={(e) => { e.stopPropagation(); onChange(!on) }} />
     </div>
   )
 }
@@ -251,7 +275,8 @@ function ProfileFields({ t, profile, update }: { t: T; profile: Profile; update:
     <div className="two-col">
       <label className="field">
         <span>{t('settings.name')}</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)}
+        <input className="input" value={name} autoComplete="name" enterKeyHint="done" onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
           onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
       </label>
       <Field label={t('settings.language')}>
@@ -271,14 +296,26 @@ function Links({ t, userId }: { t: T; userId: string }) {
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  // The hook returns the raw database message; show plain words instead.
+  const friendly = (error: string | null) => (error ? t(/duplicate|unique|exists/i.test(error) ? 'links.exists' : 'error.generic') : '')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    const u = url.trim()
-    if (!/^https?:\/\//i.test(u)) { setErr(t('settings.invalidUrl')); return }
-    const error = await add(title.trim() || hostname(u), u)
-    if (error) { setErr(error); return }
-    setErr(''); setTitle(''); setUrl('')
+    const u = normalizeUrl(url)
+    if (!u) { setErr(t('settings.invalidUrl')); return }
+    setBusy(true)
+    try {
+      const error = await add(title.trim() || hostname(u), u)
+      setErr(friendly(error))
+      if (!error) { setTitle(''); setUrl('') }
+    } finally { setBusy(false) }
+  }
+
+  async function suggest(n: string, u: string) {
+    setBusy(true)
+    try { setErr(friendly(await add(n, u))) } finally { setBusy(false) }
   }
 
   const suggestions = SUGGESTED_LINKS.filter(([, u]) => !links.some((l) => hostname(l.url) === hostname(u)))
@@ -289,11 +326,11 @@ function Links({ t, userId }: { t: T; userId: string }) {
         {links.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('links.empty')}</p>}
         <div className="src-grid">
           {links.map((l, i) => (
-            <div className="src-card" key={l.id} data-on="true">
+            <div className="src-card" key={l.id}>
               <img className="src-icon" src={faviconFor(l.url)} alt="" width={28} height={28} />
               <div className="grow"><b>{l.title}</b><small>{hostname(l.url)}</small></div>
-              <button type="button" className="icon-btn" aria-label="↑" disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
-              <button type="button" className="icon-btn" aria-label="↓" disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
+              <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
+              <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
               <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(l.id)}>✕</button>
             </div>
           ))}
@@ -303,16 +340,18 @@ function Links({ t, userId }: { t: T; userId: string }) {
         {suggestions.length > 0 && (
           <Field label={t('links.suggest')}>
             <div className="seg">
-              {suggestions.map(([n, u]) => <button key={u} type="button" onClick={() => add(n, u)}>+ {n}</button>)}
+              {suggestions.map(([n, u]) => <button key={u} type="button" disabled={busy} onClick={() => suggest(n, u)}>+ {n}</button>)}
             </div>
           </Field>
         )}
-        <form className="field" onSubmit={submit}>
+        <form className="field add-source" onSubmit={submit}>
           <span>{t('links.add')}</span>
-          <input className="input" type="url" inputMode="url" placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-          <input className="input" placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input" type="text" inputMode="url" autoComplete="off" enterKeyHint="done" aria-label={t('links.url')} placeholder={t('links.url')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <div className="row">
+            <input className="input" style={{ flex: 1 }} autoComplete="off" aria-label={t('links.name')} placeholder={t('links.name')} value={title} onChange={(e) => setTitle(e.target.value)} />
+            <button className="btn primary" type="submit" disabled={busy}>{t('settings.add')}</button>
+          </div>
           {err && <div className="msg error">{err}</div>}
-          <div><button className="btn primary" type="submit">{t('settings.add')}</button></div>
         </form>
       </div>
     </div>
@@ -329,6 +368,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     supabase.from('default_sources').select('*').order('sort_order').then(({ data }) => setDefaults((data as DefaultSource[]) ?? []))
@@ -341,23 +381,28 @@ function Sources({ t, userId }: { t: T; userId: string }) {
   async function toggleDefault(d: DefaultSource) {
     const next = !isOn(d)
     const existing = mine.find((m) => m.default_source_id === d.id)
+    if (existing?.id.startsWith('tmp-')) return // the first save is still in flight
     if (existing) {
       setMine((s) => s.map((m) => (m.id === existing.id ? { ...m, enabled: next } : m)))
       await supabase.from('user_sources').update({ enabled: next }).eq('id', existing.id)
     } else {
+      // Optimistic: move the switch right away, then swap the temporary row for the saved one (or drop it if the insert failed).
+      const temp: UserSource = { id: `tmp-${d.id}`, default_source_id: d.id, name: null, url: null, enabled: next, sort_order: 0 }
+      setMine((s) => [...s, temp])
       const { data } = await supabase.from('user_sources').insert({ user_id: userId, default_source_id: d.id, enabled: next }).select().single()
-      if (data) setMine((s) => [...s, data as UserSource])
+      setMine((s) => (data ? s.map((m) => (m.id === temp.id ? (data as UserSource) : m)) : s.filter((m) => m.id !== temp.id)))
     }
     invalidate()
   }
 
   async function addCustom(e: FormEvent) {
     e.preventDefault()
-    const u = url.trim()
-    if (!/^https?:\/\//i.test(u)) { setErr(t('settings.invalidUrl')); return }
-    setErr('')
+    const u = normalizeUrl(url)
+    if (!u) { setErr(t('settings.invalidUrl')); return }
+    setErr(''); setBusy(true)
     const { data, error } = await supabase.from('user_sources').insert({ user_id: userId, url: u, name: name.trim() || null, enabled: true }).select().single()
-    if (error) { setErr(error.message); return }
+    setBusy(false)
+    if (error) { setErr(/duplicate|unique/i.test(error.message) ? t('settings.sourceExists') : t('error.generic')); return }
     setMine((s) => [...s, data as UserSource]); setUrl(''); setName(''); invalidate()
   }
 
@@ -382,7 +427,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
   return (
     <div className="stack">
       <div className="filter-row">
-        <div className="chips" role="group" aria-label={t('settings.sources')}>
+        <div className="chips" role="group" aria-label={t('feed.sections')}>
           <button type="button" className="chip" aria-pressed={section === 'all'} onClick={() => setSection('all')}>{t('feed.all')}</button>
           {sections.map((c) => (
             <button key={c} type="button" className="chip" aria-pressed={section === c} onClick={() => setSection(c)}>{t(`category.${c}` as Key)}</button>
@@ -393,29 +438,29 @@ function Sources({ t, userId }: { t: T; userId: string }) {
             <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)}>{l === 'all' ? t('lang.all') : l.toUpperCase()}</button>
           ))}
         </div>
-        <span className="muted" style={{ marginLeft: 'auto' }}>{t('settings.activeSources', { n: activeCount })}</span>
+        <span className="muted src-count">{activeCount === 1 ? t('settings.activeSourcesOne') : t(activeCount >= 20 ? 'settings.activeSourcesMany' : 'settings.activeSources', { n: activeCount })}</span>
       </div>
 
       {shown.length === 0 && !showCustom && <p className="muted" style={{ margin: 0 }}>{t('settings.noSources')}</p>}
 
       <div className="src-grid">
         {shown.map((d) => (
-          <div className="src-card" key={d.id} data-on={isOn(d)}>
+          <div className="src-card clickable" key={d.id} data-on={isOn(d)} onClick={() => toggleDefault(d)}>
             <img className="src-icon" src={faviconFor(d.site_url ?? d.url)} alt="" width={28} height={28} loading="lazy" />
             <div className="grow">
               <b>{d.name}</b>
-              <small>{hostname(d.site_url ?? d.url)} · {t(`category.${d.category}` as Key)}</small>
+              <small>{hostname(d.site_url ?? d.url)}</small>
             </div>
-            <span className={`lang-badge lang-${d.language}`}>{d.language.toUpperCase()}</span>
-            <button type="button" role="switch" className="switch" aria-checked={isOn(d)} aria-label={d.name} onClick={() => toggleDefault(d)} />
+            <span className="lang-badge">{d.language.toUpperCase()}</span>
+            <button type="button" role="switch" className="switch" aria-checked={isOn(d)} aria-label={d.name} onClick={(e) => { e.stopPropagation(); toggleDefault(d) }} />
           </div>
         ))}
         {showCustom && custom.map((m) => (
-          <div className="src-card" key={m.id} data-on={m.enabled}>
+          <div className="src-card clickable" key={m.id} data-on={m.enabled} onClick={() => toggleCustom(m)}>
             <img className="src-icon" src={faviconFor(m.url!)} alt="" width={28} height={28} loading="lazy" />
-            <div className="grow"><b>{m.name || hostname(m.url!)}</b><small>{m.url}</small></div>
-            <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(m)}>✕</button>
-            <button type="button" role="switch" className="switch" aria-checked={m.enabled} aria-label={m.name || m.url!} onClick={() => toggleCustom(m)} />
+            <div className="grow"><b>{m.name || hostname(m.url!)}</b><small title={m.url!}>{hostname(m.url!)}</small></div>
+            <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={(e) => { e.stopPropagation(); remove(m) }}>✕</button>
+            <button type="button" role="switch" className="switch" aria-checked={m.enabled} aria-label={m.name || m.url!} onClick={(e) => { e.stopPropagation(); toggleCustom(m) }} />
           </div>
         ))}
       </div>
@@ -423,9 +468,9 @@ function Sources({ t, userId }: { t: T; userId: string }) {
       <form className="field add-source" onSubmit={addCustom}>
         <span>{t('settings.addSource')}</span>
         <div className="row">
-          <input className="input" style={{ flex: '2 1 240px' }} type="url" inputMode="url" placeholder={t('settings.sourceUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
-          <input className="input" style={{ flex: '1 1 160px' }} placeholder={t('settings.sourceName')} value={name} onChange={(e) => setName(e.target.value)} />
-          <button className="btn primary" type="submit">{t('settings.add')}</button>
+          <input className="input" style={{ flex: '2 1 240px' }} type="text" inputMode="url" autoComplete="off" aria-label={t('settings.sourceUrl')} placeholder={t('settings.sourceUrl')} value={url} onChange={(e) => setUrl(e.target.value)} required />
+          <input className="input" style={{ flex: '1 1 160px' }} autoComplete="off" aria-label={t('settings.sourceName')} placeholder={t('settings.sourceName')} value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="btn primary" type="submit" disabled={busy}>{t('settings.add')}</button>
         </div>
         {err && <div className="msg error">{err}</div>}
       </form>
@@ -438,29 +483,34 @@ type Geo = { id: number; name: string; latitude: number; longitude: number; coun
 function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props['update'] }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Geo[] | null>(null)
+  const [busy, setBusy] = useState(false)
 
   async function search(e: FormEvent) {
     e.preventDefault()
-    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=${profile.language}&format=json`)
-    const json = await res.json()
-    setResults((json.results as Geo[]) ?? [])
+    setBusy(true)
+    try {
+      const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=6&language=${profile.language}&format=json`)
+      const json = await res.json()
+      setResults((json.results as Geo[]) ?? [])
+    } catch { setResults([]) } finally { setBusy(false) }
   }
 
   return (
     <div className="two-col">
       <div className="stack">
         {profile.weather_city ? (
-          <div className="src-card" data-on="true">
-            <span className="src-icon" aria-hidden="true">📍</span>
-            <div className="grow"><b>{profile.weather_city}</b><small>{profile.weather_lat?.toFixed(2)}, {profile.weather_lon?.toFixed(2)}</small></div>
-            <button type="button" className="btn ghost" onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>{t('settings.weatherClear')}</button>
+          <div className="src-card">
+            <WeatherIcon code={0} className="src-icon" />
+            <div className="grow"><b>{profile.weather_city}</b></div>
+            <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
+              onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
           </div>
         ) : <p className="muted" style={{ margin: 0 }}>{t('settings.weatherLead')}</p>}
       </div>
       <div className="stack">
         <form className="row" onSubmit={search}>
-          <input className="input" style={{ flex: 1 }} placeholder={t('settings.weatherCity')} value={q} onChange={(e) => setQ(e.target.value)} required />
-          <button className="btn" type="submit">{t('settings.weatherSearch')}</button>
+          <input className="input" style={{ flex: 1 }} type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.weatherCity')} placeholder={t('settings.weatherCity')} value={q} onChange={(e) => setQ(e.target.value)} required />
+          <button className="btn" type="submit" disabled={busy}>{t('settings.weatherSearch')}</button>
         </form>
         {results && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
         {results && results.length > 0 && (
@@ -495,13 +545,15 @@ function PasswordForm({ t, email, hasPassword, onSet }: { t: T; email: string; h
     }
     const { error } = await supabase.auth.updateUser({ password: pw })
     setBusy(false)
-    if (error) { setMsg({ ok: false, text: error.message }); return }
+    if (error) { setMsg({ ok: false, text: /different/i.test(error.message) ? t('account.passwordSame') : t('error.generic') }); return }
     setMsg({ ok: true, text: t('account.passwordSaved') }); setCurrent(''); setPw(''); setPw2('')
     if (!hasPassword) onSet()
   }
 
   return (
     <form className="stack" onSubmit={submit}>
+      {/* Lets password managers tie the new password to this account; not shown. */}
+      <input className="visually-hidden" type="email" autoComplete="username" value={email} readOnly tabIndex={-1} aria-hidden="true" />
       <div>
         <b>{hasPassword ? t('account.changePassword') : t('account.setPassword')}</b>
         <div className="muted" style={{ fontSize: '.92em' }}>{hasPassword ? t('account.hasPassword') : t('account.setPasswordDesc')}</div>
@@ -512,7 +564,7 @@ function PasswordForm({ t, email, hasPassword, onSet }: { t: T; email: string; h
       <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.newPassword')} value={pw} onChange={(e) => setPw(e.target.value)} />
       <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.confirmPassword')} value={pw2} onChange={(e) => setPw2(e.target.value)} />
       {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
-      <div><button className="btn primary" type="submit" disabled={busy || pw.length < 8 || (hasPassword && !current)}>{t('account.save')}</button></div>
+      <div><button className="btn primary" type="submit" disabled={busy}>{t('account.save')}</button></div>
     </form>
   )
 }
@@ -542,7 +594,7 @@ function Invites({ t, lang, selfId }: { t: T; lang: Profile['language']; selfId:
     const r = await call({ action: 'invite', email: email.trim() })
     setBusy(false)
     if (r.error) {
-      const known = r.error === 'invalid_email' ? t('invites.error.invalid_email') : /already|exists|registered/i.test(r.error) ? t('invites.error.exists') : r.error
+      const known = r.error === 'invalid_email' ? t('invites.error.invalid_email') : /already|exists|registered/i.test(r.error) ? t('invites.error.exists') : t('error.generic')
       setMsg({ ok: false, text: known }); return
     }
     setMsg({ ok: true, text: t('invites.sent') }); setEmail(''); if (r.accounts) setAccounts(r.accounts)
@@ -551,29 +603,31 @@ function Invites({ t, lang, selfId }: { t: T; lang: Profile['language']; selfId:
   async function remove(a: Account) {
     if (!window.confirm(t('invites.confirmRemove', { email: a.email }))) return
     const r = await call({ action: 'remove', user_id: a.id })
-    if (r.error) { setMsg({ ok: false, text: r.error }); return }
+    if (r.error) { setMsg({ ok: false, text: t('error.generic') }); return }
     if (r.accounts) setAccounts(r.accounts)
   }
 
   return (
     <div className="two-col">
       <form className="stack" onSubmit={invite}>
-        <label className="field">
-          <span>{t('invites.email')}</span>
-          <input className="input" type="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        </label>
+        <Field label={t('invites.email')}>
+          <div className="row">
+            <input className="input" style={{ flex: 1 }} type="email" inputMode="email" autoComplete="off" required aria-label={t('invites.email')} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button className="btn primary" type="submit" disabled={busy}>{t('invites.send')}</button>
+          </div>
+        </Field>
         {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
-        <div><button className="btn primary" type="submit" disabled={busy || !email}>{t('invites.send')}</button></div>
       </form>
       <div className="stack">
         <Field label={t('invites.accounts')}>
-          <div className="stack" style={{ gap: 8 }}>
+          <div className="stack" style={{ gap: 10 }}>
             {accounts === null && <span className="muted">…</span>}
             {accounts?.map((a) => (
               <div className="src-card" key={a.id} data-on={a.status === 'active'}>
                 <div className="grow">
                   <b>{a.display_name || a.email}</b>
-                  <small>{a.email}{a.last_sign_in_at ? ` · ${t('invites.lastSeen', { time: timeAgo(a.last_sign_in_at, lang, t('time.now')) })}` : ''}</small>
+                  {a.display_name && <small>{a.email}</small>}
+                  {a.last_sign_in_at && <small>{t('invites.lastSeen', { time: timeAgo(a.last_sign_in_at, lang, t('time.now')) })}</small>}
                 </div>
                 <span className="lang-badge">{a.is_admin ? t('invites.admin') : t(`invites.status.${a.status}` as Key)}</span>
                 {!a.is_admin && a.id !== selfId && (

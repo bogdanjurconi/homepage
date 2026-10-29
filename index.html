@@ -4,8 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f8" />
+    <script>
+      // Apply the cached theme, accent, text size, font and background before the first paint,
+      // so a dark, large-text or paper user does not get a light, flat, normal-size flash while the app loads.
+      try {
+        var p = JSON.parse(localStorage.getItem('homepage.profile') || '{}') || {};
+        var d = document.documentElement.dataset;
+        var dark = p.theme === 'dark' || (p.theme !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches);
+        d.theme = dark ? 'dark' : 'light';
+        if (p.accent) d.accent = p.accent;
+        if (p.text_size) d.size = p.text_size;
+        if (p.font) d.font = p.font;
+        if (p.background) d.bg = p.background;
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#0f1115' : '#f4f5f8');
+      } catch (e) {}
+    </script>
     <meta name="description" content="O pagină de start liniștită, fără reclame." />
     <link rel="icon" type="image/svg+xml" href="/homepage/icon.svg" />
     <link rel="apple-touch-icon" href="/homepage/icon-192.png" />

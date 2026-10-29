@@ -48,3 +48,13 @@ npx supabase functions deploy feeds --project-ref "$SUPABASE_PROJECT_REF" --use-
 | `quick_links` | per-user tiles shown under the search bar |
 
 PWA icons are rendered from the SVG mark with `node scripts/icons.mjs`.
+
+## Screenshots
+
+`scripts/screenshots.mjs` captures every page at phone, tablet and desktop widths, light and dark, using the system Chrome (puppeteer-core). It needs a running `npm run preview` and a test account:
+
+```sh
+SHOT_EMAIL=... SHOT_PASSWORD=... node scripts/screenshots.mjs http://localhost:4173/homepage/ shots
+```
+
+`SHOT_COMBOS=phone-light` limits the run to one size/scheme and `SHOT_ONLY=phone-light-settings` to one capture.

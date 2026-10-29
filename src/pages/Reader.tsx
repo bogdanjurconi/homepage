@@ -35,15 +35,17 @@ export default function Reader({ t, itemId, userId }: { t: T; itemId: string; us
 
   const back = () => (window.history.length > 1 ? window.history.back() : window.location.assign('#/'))
   const siteUrl = article?.url ?? fallbackLink
+  const isSaved = savedIds.has(itemId)
+  const saveLabel = isSaved ? t('item.unsave') : t('item.save')
 
   return (
     <div className="reader">
       <div className="reader-bar">
-        <button type="button" className="btn ghost" onClick={back}><BackIcon /> {t('reader.back')}</button>
+        <button type="button" className="btn ghost" onClick={back} aria-label={t('reader.back')}><BackIcon /> <span>{t('reader.back')}</span></button>
         <span className="spacer" />
-        <button type="button" className="icon-btn" aria-pressed={savedIds.has(itemId)} aria-label={t('item.save')}
+        <button type="button" className="icon-btn" aria-pressed={isSaved} aria-label={saveLabel} title={saveLabel}
           onClick={() => toggle({ id: itemId, feed_url: '', title: article?.title ?? '', link: siteUrl ?? '', summary: null, image_url: null, published_at: null })}>
-          <StarIcon filled={savedIds.has(itemId)} />
+          <StarIcon filled={isSaved} />
         </button>
         {siteUrl && <a className="btn" href={siteUrl} target="_blank" rel="noopener noreferrer"><ExternalIcon /> {t('reader.openSite')}</a>}
       </div>

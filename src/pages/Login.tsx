@@ -19,15 +19,15 @@ export default function Login({ t, lang, onLanguage }: { t: T; lang: Language; o
     const address = email.trim().toLowerCase()
     if (mode === 'password') {
       const { error } = await supabase.auth.signInWithPassword({ email: address, password })
-      if (error) { setState('error'); setMessage(error.status === 400 ? t('login.badPassword') : error.message) }
+      if (error) { setState('error'); setMessage(t(error.status === 400 ? 'login.badPassword' : 'error.generic')) }
       return
     }
     const redirect = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
     const { error } = await supabase.auth.signInWithOtp({ email: address, options: { emailRedirectTo: redirect, shouldCreateUser: false } })
     if (error) {
       setState('error')
-      // With sign-ups disabled, unknown addresses are rejected by Auth.
-      setMessage(/signup|not allowed|not found/i.test(error.message) ? t('login.noAccount') : error.message)
+      // With sign-ups disabled, unknown addresses are rejected by Auth; 429 is the one-link-per-minute limit.
+      setMessage(/signup|not allowed|not found/i.test(error.message) ? t('login.noAccount') : error.status === 429 ? t('login.wait') : t('error.generic'))
       return
     }
     setState('sent')
@@ -37,8 +37,8 @@ export default function Login({ t, lang, onLanguage }: { t: T; lang: Language; o
     <div className="container">
       <form className="card login" onSubmit={submit}>
         <div className="login-top">
-          <span className="brand-mark"><HomeIcon /></span>
-          <div className="seg seg-small" role="group" aria-label="Language">
+          <span className="brand"><span className="brand-mark"><HomeIcon /></span>{t('appName')}</span>
+          <div className="seg seg-small" role="group" aria-label={t('settings.language')}>
             <button type="button" aria-pressed={lang === 'en'} onClick={() => onLanguage('en')}>EN</button>
             <button type="button" aria-pressed={lang === 'ro'} onClick={() => onLanguage('ro')}>RO</button>
           </div>
@@ -66,8 +66,8 @@ export default function Login({ t, lang, onLanguage }: { t: T; lang: Language; o
               </label>
             )}
             {state === 'error' && <div className="msg error">{message || t('error.generic')}</div>}
-            {mode === 'password' && <p className="muted" style={{ margin: 0, fontSize: '.9em' }}>{t('login.forgot')}</p>}
-            <button className="btn primary" type="submit" disabled={state === 'sending' || !email || (mode === 'password' && !password)}>
+            {mode === 'password' && <p className="muted">{t('login.forgot')}</p>}
+            <button className="btn primary" type="submit" disabled={state === 'sending'}>
               {state === 'sending' ? t('login.sending') : mode === 'password' ? t('login.signIn') : t('login.send')}
             </button>
             <button type="button" className="btn ghost" onClick={() => { setMode(mode === 'link' ? 'password' : 'link'); setState('idle') }}>

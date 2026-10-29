@@ -1,0 +1,133 @@
+/* Settings and Login pages. */
+/* ---------- login ---------- */
+.login { max-width: 460px; margin: max(10vh, 50vh - 320px) auto 24px; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+.login .brand-mark { width: 44px; height: 44px; font-size: 1.1em; }
+.login h1 { margin: 4px 0 0; }
+.login p { margin: 0; text-wrap: pretty; }
+.login p.muted { font-size: .95em; }
+.login-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* ---------- settings ---------- */
+.section { padding: 22px 24px; display: grid; gap: 14px; }
+.field { display: grid; gap: 6px; }
+.field > span { font-weight: 600; }
+.seg { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg button { min-height: var(--tap); padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-weight: 600; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+@media (hover: hover) { .seg button:not([aria-pressed="true"]):hover { background: var(--hover); } }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { width: var(--tap); height: var(--tap); border-radius: 50%; border: 3px solid transparent; padding: 0; }
+.swatch[aria-pressed="true"] { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
+/* swatch colours mirror the accent tokens in base.css: light first, then the dark overrides */
+.swatch[data-accent="blue"] { background: #2f6bea; }
+.swatch[data-accent="teal"] { background: #0e8577; }
+.swatch[data-accent="green"] { background: #277a4d; }
+.swatch[data-accent="amber"] { background: #9c610b; }
+.swatch[data-accent="coral"] { background: #c4432c; }
+.swatch[data-accent="violet"] { background: #7557d6; }
+:root[data-theme="dark"] .swatch[data-accent="blue"] { background: #7da3ff; }
+:root[data-theme="dark"] .swatch[data-accent="teal"] { background: #4fd1c0; }
+:root[data-theme="dark"] .swatch[data-accent="green"] { background: #72d39c; }
+:root[data-theme="dark"] .swatch[data-accent="amber"] { background: #f2b84f; }
+:root[data-theme="dark"] .swatch[data-accent="coral"] { background: #ff8f78; }
+:root[data-theme="dark"] .swatch[data-accent="violet"] { background: #b4a0ff; }
+/* the whole row toggles; a divider only between consecutive rows (-14px cancels the .section/.stack gap, keep in step) */
+.toggle-row { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 0; cursor: pointer; }
+.toggle-row + .toggle-row { border-top: 1px solid var(--line); margin-top: -14px; }
+.toggle-row .grow { flex: 1; min-width: 0; }
+.toggle-row small { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch { position: relative; width: 52px; height: 32px; flex: 0 0 auto; border-radius: 999px; border: 0; background: var(--switch-off, var(--chip)); transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); }
+.results { display: grid; gap: 6px; }
+.results button { text-align: left; min-height: var(--tap); padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
+@media (hover: hover) { .results button:hover { background: var(--hover); } }
+.status { font-size: .9em; color: var(--muted); min-height: 1.4em; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* ---------- settings v2 ---------- */
+.settings-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+.settings-nav { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.settings-nav::-webkit-scrollbar { display: none; }
+.settings-nav button { flex: 0 0 auto; text-align: left; min-height: var(--tap); padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.settings-nav button[aria-current="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+/* phones: edge-to-edge strip, so a cut chip reads as "more to scroll" and focus rings have room */
+@media (max-width: 719px) { .settings-nav { margin: 0 -16px; padding: 4px 16px 8px; scroll-padding-inline: 16px; } }
+/* tablets: two rows instead of a hidden overflow */
+@media (min-width: 720px) and (max-width: 899px) { .settings-nav { flex-wrap: wrap; overflow: visible; } }
+@media (min-width: 900px) {
+  .settings-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; max-width: 1104px; margin: 0 auto; align-items: start; }
+  .settings-nav { position: sticky; top: 76px; flex-direction: column; gap: 2px; padding: 6px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .settings-nav button { border: 0; background: transparent; }
+  .settings-nav button:hover { background: var(--hover); color: var(--fg); }
+  .settings-nav button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+}
+.settings-main { display: grid; gap: 16px; min-width: 0; max-width: 860px; }
+.settings-main .section { scroll-margin-top: 76px; }
+.settings-main .filter-row { margin-bottom: 0; }
+.src-count { margin-left: auto; }
+.section-head { display: grid; gap: 2px; }
+.section-head p { margin: 0; }
+.stack { display: grid; gap: 14px; align-content: start; }
+.two-col { display: grid; gap: 16px; }
+@media (min-width: 720px) { .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
+/* account: sign-out is a footer action, bottom-right beside "Save password"; on phones a hairline separates it from the form */
+.account-actions { justify-items: start; }
+@media (min-width: 720px) { .account-actions { justify-items: end; align-self: end; } }
+@media (max-width: 719px) { .account-actions { padding-top: 14px; border-top: 1px solid var(--line); } }
+
+.look-grid { display: grid; gap: 20px; }
+.look-preview { display: grid; gap: 8px; align-content: start; }
+.look-preview > small { font-size: 1em; font-weight: 600; color: var(--fg); }
+.look-preview .preview { pointer-events: none; }
+.look-preview .card { border: 1px solid var(--line); }
+.look-preview .grid.preview { grid-template-columns: 1fr; }
+@media (min-width: 720px) {
+  .look-grid { grid-template-columns: minmax(0, 1fr) min(300px, 36%); }
+  .look-preview { position: sticky; top: 90px; align-self: start; }
+}
+.preview-img { aspect-ratio: 16 / 9; background: var(--accent-soft); }
+@supports (color: color-mix(in srgb, red, blue)) { .preview-img { background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent) 55%, var(--card))); } }
+
+.option-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.option-card { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 84px; padding: 12px 8px; border: 2px solid var(--line); border-radius: var(--radius-md); background: var(--card); font-weight: 600; font-size: .92em; text-align: center; }
+@media (hover: hover) { .option-card:hover { background: var(--hover); } }
+.option-card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.layout-glyph { width: 48px; height: 36px; fill: currentColor; opacity: .7; }
+.option-card[aria-pressed="true"] .layout-glyph { opacity: 1; }
+.font-glyph { font-size: 1.7em; line-height: 1; font-weight: 700; }
+.option-card[data-font="serif"] .font-glyph { font-family: "Source Serif 4 Variable", Georgia, serif; }
+.option-card[data-font="rounded"] .font-glyph { font-family: "Nunito Variable", system-ui, sans-serif; }
+.option-card[data-font="system"] .font-glyph { font-family: system-ui, sans-serif; }
+.bg-glyph { display: block; width: 48px; height: 32px; border-radius: 8px; border: 1px solid var(--line); }
+.bg-flat { background: var(--bg); }
+.bg-tinted { background: var(--accent-soft); }
+@supports (color: color-mix(in srgb, red, blue)) { .bg-tinted { background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 35%, var(--bg)), var(--bg)); } }
+.bg-paper { background: #f4eee4; }
+:root[data-theme="dark"] .bg-paper { background: #211d15; }
+@media (max-width: 719px) {
+  .option-cards { gap: 6px; }
+  .option-card { padding: 10px 4px; font-size: .85em; }
+}
+
+.src-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
+.src-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); transition: border-color .15s; }
+.src-card[data-on="true"] { border-color: var(--accent); background: var(--accent-soft); }
+@supports (color: color-mix(in srgb, red, blue)) { .src-card[data-on="true"] { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent-soft) 40%, var(--card)); } }
+.src-card.clickable { cursor: pointer; }
+.src-card .grow { flex: 1; min-width: 0; }
+.src-card b { display: block; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-card small { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.src-icon { width: 28px; height: 28px; padding: 3px; border-radius: 8px; flex: 0 0 auto; display: grid; place-items: center; background: var(--chip); }
+.src-card svg.src-icon { color: var(--accent); }
+.lang-badge { flex: 0 0 auto; font-size: .78em; font-weight: 800; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+.seg-small button { min-height: 40px; padding: 0 12px; font-size: .9em; }
+.add-source .row { align-items: stretch; }
+@media (max-width: 719px) {
+  /* the login card drops to the 16px side padding every other card uses on phones */
+  .login { padding: 22px 16px; }
+  /* wrapped segment rows fill the width; the five currencies stay on one row; link rows leave more room for the text */
+  .seg:not(.seg-small) button { flex: 1 1 auto; padding: 0 10px; }
+  .seg-small { gap: 6px; }
+  .seg-small button { padding: 0 10px; }
+  .src-card { gap: 6px; padding: 10px 8px 10px 12px; }
+}

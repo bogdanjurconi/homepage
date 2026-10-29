@@ -1,0 +1,35 @@
+/* Reader mode. */
+/* ---------- reader ---------- */
+.reader { max-width: 720px; margin: 0 auto; }
+.reader-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.reader-bar .btn { white-space: nowrap; }
+.reader-body { padding: 22px 22px 30px; font-size: 1.08em; line-height: 1.6; }
+.reader-body h1 { font-size: 1.7em; line-height: 1.2; margin: 0 0 10px; text-wrap: balance; }
+.reader-meta { color: var(--muted); margin-bottom: 18px; }
+.reader-hero { width: 100%; max-height: 60vh; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 18px; }
+.reader-content img, .reader-content video, .reader-content iframe { max-width: 100%; height: auto; border-radius: var(--radius-sm); }
+.reader-content img { width: auto; max-height: 80vh; }
+.reader-content figure { margin: 18px 0; }
+.reader-content figcaption { color: var(--muted); font-size: .85em; }
+.reader-content p { margin: 0 0 1em; }
+.reader-content h2, .reader-content h3 { line-height: 1.3; margin: 1.4em 0 .5em; }
+.reader-content blockquote { margin: 1em 0; padding: 4px 16px; border-left: 4px solid var(--accent); color: var(--muted); }
+.reader-content a { color: var(--accent); }
+.reader-content table { max-width: 100%; overflow-x: auto; display: block; }
+/* no trailing gap under the last block: Readability nests the text in wrapper divs, so follow the last-child chain down */
+.reader-content > :last-child,
+.reader-content > :last-child > :last-child,
+.reader-content > :last-child > :last-child > :last-child,
+.reader-content > :last-child > :last-child > :last-child > :last-child { margin-bottom: 0; }
+@media (max-width: 719px) {
+  /* phones: icon-only Back like the header nav (the label stays for screen readers); "open on site" keeps its label.
+     the -12px margin pairs with the 12px phone padding (same as .feed-head in feed.css) so the chevron sits on the content edge */
+  .reader-bar .btn.ghost { padding: 0 12px; margin-left: -12px; }
+  .reader-bar .btn.ghost span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .reader-body { padding: 18px 16px 24px; }
+  .reader-body h1 { font-size: 1.4em; }
+}
+@media (max-width: 420px) {
+  /* narrow phones (same breakpoint as the weather card): the "open on site" pill drops its icon so the toolbar stays on one line at large text */
+  .reader-bar .btn:not(.ghost) svg { display: none; }
+}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from './hooks/useAuth'
 import { useProfile } from './hooks/useProfile'
 import { useHashRoute } from './hooks/useHashRoute'
@@ -15,12 +15,13 @@ import Reader from './pages/Reader'
 export default function App() {
   const { session, ready } = useAuth()
   const userId = session?.user.id
-  const { profile, update, saving } = useProfile(userId)
+  const { profile, update, saving, saveError } = useProfile(userId)
   const [route, go] = useHashRoute()
 
   const [guestLang, setGuestLang] = useState<Language>(readGuestLanguage)
   const effective: Profile = profile ?? { id: userId ?? '', ...DEFAULT_PROFILE, language: guestLang }
   const t = useMemo(() => makeT(effective.language), [effective.language])
+  useEffect(() => { document.documentElement.lang = effective.language }, [effective.language])
 
   if (!ready) return null
   if (!session) return <Login t={t} lang={guestLang} onLanguage={(l) => { setGuestLanguage(l); setGuestLang(l) }} />
@@ -33,7 +34,7 @@ export default function App() {
         <div className="container">
           {route.name === 'feed' && <Feed t={t} profile={effective} userId={uid} />}
           {route.name === 'saved' && <Saved t={t} profile={effective} userId={uid} />}
-          {route.name === 'settings' && <Settings t={t} profile={effective} update={update} saving={saving} userId={uid} email={session.user.email ?? ''} />}
+          {route.name === 'settings' && <Settings t={t} profile={effective} update={update} saving={saving} saveError={saveError} userId={uid} email={session.user.email ?? ''} />}
           {route.name === 'read' && route.param && <Reader t={t} itemId={route.param} userId={uid} />}
         </div>
       </main>

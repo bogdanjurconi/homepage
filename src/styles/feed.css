@@ -1,0 +1,82 @@
+/* Feed page: hero, filter row, article cards, layouts. */
+/* ---------- feed ---------- */
+.feed-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+/* pull the ghost button's padding past the content edge so its label lines up with the cards below */
+.feed-head .btn.ghost { margin-right: -18px; }
+.page-title { margin: 4px 0 16px; }
+/* feed notices (load error, per-source warnings) keep one gap above the cards */
+.container > .msg { margin-bottom: 12px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.article { display: flex; flex-direction: column; overflow: hidden; text-decoration: none; position: relative; transition: transform .12s ease; }
+/* lift only with a real pointer, so a tap on a phone does not leave the card stuck raised */
+@media (hover: hover) { .article:hover { transform: translateY(-2px); } }
+.article-img { aspect-ratio: 16 / 9; width: 100%; object-fit: cover; background: var(--chip); }
+.article-body { padding: 14px 16px 8px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.article-src { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85em; }
+.article-src b { color: var(--accent); }
+.article-title { font-weight: 700; font-size: 1.05em; line-height: 1.3; margin: 0; }
+.article-title a { text-decoration: none; }
+.article-title a::after { content: ""; position: absolute; inset: 0; }
+/* keyboard focus outlines the card that takes the click, not the inline title text */
+@supports selector(:has(a)) {
+  .article:has(.article-title a:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .article:has(.article-title a:focus-visible) .article-title a { outline: none; }
+}
+.article-sum { margin: 0; color: var(--muted); font-size: .92em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* a card without an image lets its summary use the room the row gets from the other cards' images */
+.grid .article-body:first-child .article-sum, .magazine .article-body:first-child .article-sum { -webkit-line-clamp: 6; }
+/* from 720px the rows are set by 16:9 images in two or more columns: ten lines still keep an image-less card shorter than its neighbours */
+@media (min-width: 720px) { .grid .article-body:first-child .article-sum, .magazine .article-body:first-child .article-sum { -webkit-line-clamp: 10; } }
+.article-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+.article-foot .article-src { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+.article-foot .article-src b, .article-foot .article-src time { overflow: hidden; text-overflow: ellipsis; }
+.article-actions { display: flex; position: relative; z-index: 1; margin-right: -8px; }
+/* compact list layout */
+.list { display: flex; flex-direction: column; gap: 8px; }
+.list .article { flex-direction: row; align-items: stretch; }
+.list .article-img { width: 112px; aspect-ratio: 1; flex: 0 0 auto; }
+.list .article-body { padding: 10px 14px; gap: 4px; }
+.list .article-title { font-size: 1em; }
+.list .article-sum { display: none; }
+.list .article-foot { padding-top: 0; }
+@media (max-width: 480px) { .list .article-img { width: 88px; } }
+/* ---------- hero + magazine ---------- */
+/* greeting strip */
+.hero { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin: 6px 0 18px; }
+.hero-text { flex: 1 1 260px; display: flex; flex-direction: column; justify-content: center; }
+.hero h1 { font-size: 1.9em; line-height: 1.15; margin: 0; letter-spacing: -0.015em; }
+.hero .date { color: var(--muted); margin-top: 4px; }
+.hero .date::first-letter { text-transform: uppercase; }
+
+/* magazine layout: first story large */
+.magazine { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.magazine .article.lead { grid-column: 1 / -1; }
+.magazine .article.lead .article-title { font-size: 1.45em; }
+.magazine .article.lead .article-sum { -webkit-line-clamp: 4; font-size: 1em; }
+@media (min-width: 720px) {
+  .magazine .article.lead { flex-direction: row; }
+  .magazine .article.lead .article-img { width: 56%; aspect-ratio: 16 / 10; }
+  .magazine .article.lead .article-body { padding: 22px 26px; justify-content: center; }
+  .magazine .article.lead .article-title { font-size: 1.8em; }
+  /* a fixed margin lets justify-content: center group title, summary and footer instead of pinning the footer to the bottom */
+  .magazine .article.lead .article-foot { margin-top: 10px; }
+}
+/* ---------- filter row ---------- */
+/* feed filter row */
+.filter-row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-row .chips { flex: 1 1 auto; min-width: 0; }
+/* ---------- filter pill ---------- */
+.filter-box { position: relative; display: flex; align-items: center; flex: 0 1 280px; min-width: 200px; min-height: 40px; padding: 0 14px 0 12px; gap: 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+.filter-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.filter-box svg { width: 1.1em; height: 1.1em; color: var(--muted); flex: 0 0 auto; }
+.filter-box input { flex: 1; min-width: 0; border: 0; background: transparent; min-height: 38px; font-size: .95em; }
+.filter-box input:focus { outline: none; }
+.filter-box input::-webkit-search-cancel-button { -webkit-appearance: none; }
+/* inert while the pill shares a line with the chips; right-aligns it under the refresh button when it wraps (tablets) */
+.chips + .filter-box { margin-left: auto; }
+@media (max-width: 719px) {
+  .filter-box { flex: 1 1 auto; width: 100%; }
+  .chips + .filter-box { margin-left: 0; }
+  /* pairs with the 12px phone padding set in responsive.css so the icon sits on the content edge */
+  .feed-head .btn.ghost { margin-right: -12px; }
+}

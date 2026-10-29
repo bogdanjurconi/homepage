@@ -11,7 +11,7 @@ function Nav({ t, route, go, className }: Props & { className?: string }) {
     { r: 'settings', label: t('nav.settings'), icon: <GearIcon /> },
   ]
   return (
-    <nav className={`nav ${className ?? ''}`} aria-label="Main">
+    <nav className={`nav ${className ?? ''}`} aria-label={t('nav.menu')}>
       {items.map((i) => (
         <button key={i.r} type="button" onClick={() => go(i.r)} aria-current={route.name === i.r ? 'page' : undefined}>
           {i.icon}

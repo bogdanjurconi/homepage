@@ -84,5 +84,6 @@ export function todayAndUpcoming(now = new Date(), horizonDays = 14): { today: C
 }
 
 export function formatDay(d: Date, lang: Language): string {
-  return new Intl.DateTimeFormat(lang, { weekday: 'short', day: 'numeric', month: 'short' }).format(d)
+  const s = new Intl.DateTimeFormat(lang, { weekday: 'short', day: 'numeric', month: 'short' }).format(d)
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }

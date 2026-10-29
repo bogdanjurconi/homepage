@@ -23,6 +23,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.89.0",
+    "puppeteer-core": "^25.16.0",
     "sharp": "^0.35.5",
     "supabase": "^2.122.0",
     "typescript": "~7.0.2",

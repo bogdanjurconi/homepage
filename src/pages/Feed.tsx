@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
 import { CATEGORY_ORDER, type Category, type FeedItem, type FeedsResponse, type Profile } from '../lib/types'
 import { timeAgo } from '../lib/time'
+import { FEED_CACHE_KEY, readFeedCache, type CachedFeed } from '../lib/feedCache'
 import { useSaved } from '../hooks/useSaved'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import ArticleCard from '../components/ArticleCard'
@@ -13,18 +14,11 @@ import SearchBar from '../components/SearchBar'
 import QuickLinks from '../components/QuickLinks'
 import { RefreshIcon, SearchIcon } from '../components/Icons'
 
-const CACHE_KEY = 'homepage.feed'
-type Cached = FeedsResponse & { at: string }
-
-function readCache(): Cached | null {
-  try { const raw = sessionStorage.getItem(CACHE_KEY); return raw ? (JSON.parse(raw) as Cached) : null } catch { return null }
-}
-
 // Diacritics-insensitive, case-insensitive match for the news filter.
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
 export default function Feed({ t, profile, userId }: { t: T; profile: Profile; userId: string }) {
-  const [data, setData] = useState<Cached | null>(readCache)
+  const [data, setData] = useState<CachedFeed | null>(readFeedCache)
   const [loading, setLoading] = useState(!data)
   const [error, setError] = useState(false)
   const [section, setSection] = useState<Category | 'all'>('all')
@@ -36,13 +30,13 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
     setLoading(true); setError(false)
     const { data: res, error: err } = await supabase.functions.invoke<FeedsResponse>('feeds', { body: { force } })
     if (err || !res) { setError(true); setLoading(false); return }
-    const cached: Cached = { ...res, at: new Date().toISOString() }
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(cached))
+    const cached: CachedFeed = { ...res, at: new Date().toISOString() }
+    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify(cached))
     setData(cached); setLoading(false)
   }, [])
 
   useEffect(() => {
-    const c = readCache()
+    const c = readFeedCache()
     if (!c || Date.now() - Date.parse(c.at) > 5 * 60_000) void load()
   }, [load])
 
@@ -93,7 +87,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       )}
 
       <div className="feed-head">
-        <h2 style={{ margin: 0 }}>{t('nav.feed')}</h2>
+        <h2>{t('nav.feed')}</h2>
         {data && <span className="muted">· {t('feed.updated', { time: timeAgo(data.at, profile.language, t('time.now')) })}</span>}
         <span className="spacer" />
         <button type="button" className="btn ghost" onClick={() => load(true)} disabled={loading} aria-label={t('feed.refresh')}>
@@ -104,7 +98,7 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       {data && (
         <div className="filter-row">
           {sections.length > 1 && (
-            <div className="chips" role="group" aria-label={t('settings.sources')}>
+            <div className="chips" role="group" aria-label={t('feed.sections')}>
               <button type="button" className="chip" aria-pressed={section === 'all'} onClick={() => setSection('all')}>{t('feed.all')}</button>
               {sections.map((c) => (
                 <button key={c} type="button" className="chip" aria-pressed={section === c} onClick={() => setSection(c)}>{t(`category.${c}` as Key)}</button>
@@ -113,15 +107,17 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
           )}
           <label className="filter-box">
             <SearchIcon />
-            <input type="search" placeholder={t('feed.filter')} aria-label={t('feed.filter')} value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input type="search" autoComplete="off" placeholder={t('feed.filter')} aria-label={t('feed.filter')} value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
         </div>
       )}
 
       {error && <div className="msg error">{t('feed.error')}</div>}
-      {failed.map((s) => <div key={s.url} className="msg" style={{ marginBottom: 8 }}>{t('feed.sourceError', { name: s.name })}</div>)}
+      {failed.map((s) => <div key={s.url} className="msg">{t('feed.sourceError', { name: s.name })}</div>)}
       {loading && !data && <p className="muted">{t('feed.loading')}</p>}
-      {data && items.length === 0 && !loading && <p className="muted">{t('feed.empty')}</p>}
+      {data && items.length === 0 && !loading && (
+        <p className="muted">{data.items.length ? t('feed.noMatch') : t('feed.empty')}</p>
+      )}
 
       <div className={layoutClass}>
         {items.map((item, i) => (

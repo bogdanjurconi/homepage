@@ -14,7 +14,7 @@ const CACHE_KEY = 'homepage.weather.v3'
 
 export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
   const [data, setData] = useState<Forecast | null>(() => {
-    try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? 'null'); return c && c.key === `${lat},${lon}` && Date.now() - c.at < 20 * 60_000 ? c.data : null } catch { return null }
+    try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? 'null'); return c && c.key === `${lat},${lon}` && Date.now() - c.at < 20 * 60_000 && c.data?.current ? c.data : null } catch { return null }
   })
   const [error, setError] = useState(false)
 
@@ -24,19 +24,23 @@ export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
       `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,is_day` +
       `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`
     fetch(url).then((r) => r.json()).then((d: Forecast) => {
+      if (!d?.current || !d?.daily?.time) throw new Error('bad forecast')
       sessionStorage.setItem(CACHE_KEY, JSON.stringify({ key: `${lat},${lon}`, at: Date.now(), data: d }))
       setData(d)
     }).catch(() => setError(true))
   }, [lat, lon, data])
 
   if (error) return <section className="card weather weather-empty muted">{t('weather.error')}</section>
-  if (!data) return <section className="card weather weather-empty" aria-busy="true" />
+  if (!data) return <section className="card weather weather-empty muted" aria-busy="true">…</section>
 
   const { current: c, daily } = data
   const isDay = c.is_day === 1
-  const dayName = (iso: string, i: number) =>
-    i === 0 ? t('weather.today') : i === 1 ? t('weather.tomorrow') : new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(iso))
-  const hi = Math.round(daily.temperature_2m_max[0]), lo = Math.round(daily.temperature_2m_min[0])
+  const dayName = (iso: string, i: number) => {
+    if (i === 0) return t('weather.today')
+    if (i === 1) return t('weather.tomorrow')
+    const s = new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(new Date(iso))
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
 
   return (
     <section className="card weather" aria-label={t('settings.weather')}>
@@ -47,7 +51,6 @@ export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
           <div className="w-cond">{t(`wmo.${c.weather_code}` as Key)}</div>
           <div className="w-sub">{city}{city ? ' · ' : ''}{t('weather.feels', { t: ` ${Math.round(c.apparent_temperature)}°` })}</div>
           <div className="w-chips">
-            <span>↑ {hi}°  ↓ {lo}°</span>
             <span>{t('weather.wind')} {Math.round(c.wind_speed_10m)} km/h</span>
             <span>{t('weather.humidity')} {c.relative_humidity_2m}%</span>
           </div>

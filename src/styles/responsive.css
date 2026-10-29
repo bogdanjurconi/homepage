@@ -1,0 +1,24 @@
+/* Cross-cutting responsive overrides. Imported LAST so it wins the cascade. */
+/* ---------- responsive hardening ---------- */
+.app { overflow-x: clip; }
+input, select, textarea, button { min-width: 0; max-width: 100%; }
+.field, .field > *, .stack > *, .two-col > *, .look-grid > *, .settings-main > *, .section > * { min-width: 0; }
+.src-card > * { min-width: 0; }
+.src-card .lang-badge, .src-card .switch, .src-card .src-icon, .src-card .icon-btn { min-width: auto; flex-shrink: 0; }
+.rates-head, .hero-text { min-width: 0; }
+@media (max-width: 719px) {
+  /* feed heading stays on one line: status ellipsised, refresh button icon-only (it keeps its aria-label) */
+  .feed-head .muted { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed-head .btn.ghost { padding: 0 12px; flex: 0 0 auto; }
+  .feed-head .btn.ghost span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  /* chip rows scroll edge to edge; the first chip still starts at the 16px gutter and focus rings are not clipped */
+  .filter-row { flex-direction: column; align-items: stretch; gap: 6px; }
+  .filter-row .chips { width: calc(100% + 32px); margin: 0 -16px; padding: 4px 16px; scroll-padding-inline: 16px; }
+  .filter-row > .src-count { margin-left: 0; }
+  .settings-main .section { padding: 18px 16px; }
+  .look-preview { display: none; }
+}
+/* tablets and up: the chip strip is a scroll container, so give a focused chip's ring room on every side; the margin cancels the padding, nothing moves */
+@media (min-width: 720px) {
+  .filter-row .chips { padding: 5px; margin: -5px; scroll-padding-inline: 5px; }
+}
