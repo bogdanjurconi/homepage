@@ -65,13 +65,14 @@
 /* tablets: two rows instead of a hidden overflow */
 @media (min-width: 720px) and (max-width: 899px) { .settings-nav { flex-wrap: wrap; overflow: visible; } }
 @media (min-width: 900px) {
-  .settings-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; max-width: 1104px; margin: 0 auto; align-items: start; }
+  .settings-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; max-width: 924px; margin: 0 auto; align-items: start; }
   .settings-nav { position: sticky; top: 76px; flex-direction: column; gap: 2px; padding: 6px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
   .settings-nav button { border: 0; background: transparent; }
   .settings-nav button:hover { background: var(--hover); color: var(--fg); }
   .settings-nav button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
 }
-.settings-main { display: grid; gap: 16px; min-width: 0; max-width: 860px; }
+/* a settings column the width of a phone-settings page or a Mac preferences window: rows stay readable left to right */
+.settings-main { display: grid; gap: 16px; min-width: 0; max-width: 680px; }
 .settings-main .section { scroll-margin-top: 76px; }
 .settings-main .filter-row { margin-bottom: 0; }
 .src-count { margin-left: auto; }
@@ -82,12 +83,84 @@
 .two-col { display: grid; gap: 16px; }
 @media (min-width: 720px) { .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
 /* account: sign-out is a footer action, bottom-right beside "Save password"; on phones a hairline separates it from the form */
-.account-actions { justify-items: start; }
-@media (min-width: 720px) { .account-actions { justify-items: end; align-self: end; } }
-@media (max-width: 719px) { .account-actions { padding-top: 14px; border-top: 1px solid var(--line); } }
+/* Every setting is a row: its name (and a short hint) on the left, the control at the right end, a line
+   between rows. Phones: name and control share a line when they fit; a wide control (option cards,
+   swatches) takes the line under the name. */
+.pref-rows { display: grid; min-width: 0; }
+.pref-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--line); align-items: center; }
+.pref-row:first-child { border-top: 0; padding-top: 0; }
+.pref-row:last-child { padding-bottom: 0; }
+.pref-row[aria-disabled="true"] { opacity: .5; }
+.pref-label { font-weight: 600; }
+.pref-value { display: flex; justify-content: flex-end; align-items: center; gap: 8px; min-width: 0; }
+/* a pair stays together: when it does not fit beside its name, the whole pair moves to the next line */
+.pref-rows .pref-value, .pref-rows .pref-value .seg { flex-wrap: nowrap; }
+/* text fields are as wide as two pills, so they line up with the pairs around them */
+.pref-value > .input { flex: 0 1 auto; width: calc(13.5em + 8px); max-width: 100%; }
+.pref-value > .btn { flex: 0 0 auto; white-space: nowrap; }
+/* option cards (layout, font, background) share one width, so the three rows line up */
+.pref-value > .option-cards { width: 390px; max-width: 100%; }
+/* the other wide rows (theme, text size, colours) take the same 390px, so every Appearance control has the cards' edges */
+@media (min-width: 720px) {
+  .pref-wide .pref-value > .seg:not(.seg-small) { width: 390px; }
+  .pref-rows .pref-wide .pref-value > .seg:not(.seg-small) button { flex: 1 1 0; width: auto; }
+  .pref-wide .pref-value > .swatches { width: 390px; justify-content: space-between; flex-wrap: nowrap; }
+}
+/* a read-only state ("Set", the chosen city): the size of the buttons beside it, but flat and grey with no border, so it does not look pressable */
+.status-pill { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap); padding: 0 16px; border: 1px solid transparent; border-radius: 999px; background: var(--chip); color: var(--muted); font-weight: 600; cursor: default; }
+/* the two-pill rows (English | Română, Set | Change) share one pill width, so their edges line up row under row */
+.pref-rows .pref-value .seg:not(.seg-small) button, .pref-rows .pref-value .status-pill.pair, .pref-rows .pref-value > .btn.pair { flex: 0 0 auto; width: 6.75em; padding: 0 10px; }
+/* a longer set of small pills (currencies) may wrap within its row */
+.pref-rows .pref-value .seg.seg-small { flex-wrap: wrap; justify-content: flex-end; }
+/* the choices of the row above: a quieter name, no line between them and their switch */
+.pref-sub { border-top: 0; padding-top: 0; }
+.pref-sub .pref-label { font-weight: 400; color: var(--muted); }
+.pref-email { display: block; font-weight: 400; overflow-wrap: anywhere; color: var(--muted); }
+/* a team row: crest and name as the row's name */
+.team-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pref-temp { font-weight: 400; margin-left: 2px; }
+/* notes and result lists under a search row take the full width */
+.pref-note { grid-column: 1 / -1; margin: 0; padding-top: 10px; }
+/* the password form opens under its row, in a narrow column */
+.pref-row > .password-form { grid-column: 1 / -1; grid-template-columns: minmax(0, 420px); padding-top: 6px; }
+/* a sub-row in the control column: name and switch share the option cards' 390px, under them */
+@media (min-width: 720px) {
+  .pref-under { grid-template-columns: minmax(0, 1fr) 390px; }
+  .pref-under .pref-label, .pref-under .pref-value { grid-column: 2; grid-row: 1; }
+  .pref-under .pref-label { justify-self: start; }
+  .pref-under .pref-value { justify-self: end; }
+}
+@media (max-width: 719px) {
+  .pref-row { display: flex; flex-wrap: wrap; justify-content: space-between; }
+  .pref-label { flex: 0 1 auto; min-width: 0; }
+  /* min-width auto: the control never shrinks below its button; the name and address give way instead */
+  .pref-value { flex: 1 1 0; min-width: auto; }
+  .pref-wide .pref-value { flex-basis: 100%; }
+  /* a wide row's pills share its line: they stretch to fill it instead of keeping the fixed pair width */
+  .pref-wide .pref-value .seg:not(.seg-small) { flex: 1; flex-wrap: wrap; }
+  .pref-wide .pref-value .seg:not(.seg-small) button { width: auto; flex: 1 1 auto; }
+  .pref-value > .option-cards { width: 100%; }
+  .pref-row > .password-form, .pref-note { flex: 0 0 100%; }
+}
+/* a password form reads best as one narrow column: labels above fields, one button at the end */
+.password-form { display: grid; gap: 14px; }
+.password-form .hint { font-size: .92em; }
+.password-form small { font-size: .85em; }
+.field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.field-head > label { font-weight: 600; }
+/* a quiet text action, like "Forgot your password?" next to a field label */
+.link-btn { border: 0; background: none; padding: 4px 0; color: var(--accent); font: inherit; font-size: .9em; font-weight: 600; cursor: pointer; }
+.link-btn:hover { text-decoration: underline; }
+.link-btn:disabled { opacity: .5; cursor: default; }
 
-.look-grid { display: grid; gap: 20px; }
-.look-preview { display: grid; gap: 8px; align-content: start; }
+/* the preview stays in view (under the header) while the Appearance rows scroll under it, so every change
+   shows at once; it is a short strip, the first row of stories */
+.look-preview { display: grid; gap: 8px; align-content: start; margin-bottom: 6px; position: sticky; top: 62px; z-index: 2; background: var(--card); padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
+.look-preview .preview-frame { max-height: 190px; }
+/* a sticky band stops at its section's padding: move 10px of the Appearance card's bottom padding inside,
+   so the band can travel those 10px further down before it leaves */
+.settings-main #look { padding-bottom: 12px; }
+#look .pref-rows .pref-row:last-child { padding-bottom: 10px; }
 .look-preview > small { font-size: 1em; font-weight: 600; color: var(--fg); }
 .look-preview .preview { pointer-events: none; }
 .look-preview .card { border: 1px solid var(--line); }
@@ -96,18 +169,11 @@
 .magazine.preview .article:nth-child(n+4) { display: none; }
 /* the page's magazine allows three columns from 340px; the 640px preview keeps its two, as before */
 .look-preview .magazine { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-/* in the preview the magazine lead is a wider, taller card, image on top like the two below it */
-.look-preview .magazine .article.lead { flex-direction: column; }
-.look-preview .magazine .article.lead .article-img { width: 100%; aspect-ratio: 21 / 9; }
-.look-preview .magazine .article.lead .article-body { padding: 14px 16px 8px; justify-content: flex-start; }
-.look-preview .magazine .article.lead .article-title { font-size: 1.35em; }
-.look-preview .magazine .article.lead .article-foot { margin-top: auto; }
+/* the magazine lead keeps the front page's look (half picture, half text), so it fits the short strip */
 .preview-img[data-hue="1"] { filter: hue-rotate(45deg); }
 .preview-img[data-hue="2"] { filter: hue-rotate(-40deg) saturate(.8); }
 .preview-img[data-hue="3"] { filter: hue-rotate(90deg) saturate(.7); }
 @media (min-width: 720px) {
-  .look-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .look-preview { position: sticky; top: 90px; align-self: start; }
 }
 .preview-img { aspect-ratio: 16 / 9; background: var(--accent-soft); }
 @supports (color: color-mix(in srgb, red, blue)) { .preview-img { background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent) 55%, var(--card))); } }
@@ -160,5 +226,12 @@
   .seg-small button { padding: 0 10px; }
   .src-card { gap: 6px; padding: 10px 8px 10px 12px; }
 }
-/* weather and sport: what is chosen, then one search field with its results, in one column of a comfortable width */
-.picker { max-width: 560px; }
+/* phones: the settings list (one row per section, a chevron to its page) and the way back from a page */
+.settings-list { display: grid; padding: 4px 0; }
+.settings-list a { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 18px; text-decoration: none; color: var(--fg); }
+.settings-list a + a { border-top: 1px solid var(--line); }
+.settings-list .grow { flex: 1; min-width: 0; }
+.settings-list small { display: block; color: var(--muted); font-size: .88em; margin-top: 2px; }
+.settings-list .chevron { width: 1.1em; height: 1.1em; flex: 0 0 auto; color: var(--muted); transform: rotate(180deg); }
+.settings-back { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); margin-left: -8px; padding: 0 8px; color: var(--accent); font-weight: 700; font-size: 1.05em; text-decoration: none; }
+.settings-back svg { width: 1.2em; height: 1.2em; }

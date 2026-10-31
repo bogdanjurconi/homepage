@@ -2,7 +2,7 @@
 /* ---------- responsive hardening ---------- */
 .app { overflow-x: clip; }
 input, select, textarea, button { min-width: 0; max-width: 100%; }
-.field, .field > *, .stack > *, .two-col > *, .look-grid > *, .settings-main > *, .section > * { min-width: 0; }
+.field, .field > *, .stack > *, .two-col > *, .settings-main > *, .section > * { min-width: 0; }
 .src-card > * { min-width: 0; }
 .src-card .lang-badge, .src-card .switch, .src-card .src-icon, .src-card .icon-btn { min-width: auto; flex-shrink: 0; }
 .rates-head, .hero-text { min-width: 0; }

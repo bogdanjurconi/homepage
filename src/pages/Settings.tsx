@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { customAccentVars, isCustomAccent } from '../lib/accent'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
@@ -10,10 +10,13 @@ import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { CURRENCIES, MAX_TEAMS, type SportTeamOption, type Team } from '../lib/types'
 import { faviconFor } from '../components/QuickLinks'
-import { StarIcon, BookIcon } from '../components/Icons'
+import { StarIcon, BookIcon, BackIcon } from '../components/Icons'
+import { useMedia } from '../hooks/useMedia'
 import WeatherIcon from '../components/WeatherIcon'
+import { useForecast } from '../hooks/useForecast'
+import { hrefFor } from '../hooks/useHashRoute'
 
-type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; saveError?: boolean; userId: string; email: string }
+type Props = { t: T; profile: Profile; update: (p: Partial<Omit<Profile, 'id'>>) => Promise<void>; saving: boolean; saveError?: boolean; userId: string; email: string; sub?: string }
 
 // Accepts a bare domain ('digi24.ro') and returns it as a full https:// address, or null when it is not a web address.
 function normalizeUrl(raw: string): string | null {
@@ -25,27 +28,57 @@ function normalizeUrl(raw: string): string | null {
   } catch { return null }
 }
 
-type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'sport' | 'account' | 'invites'
+type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'sport' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
   { id: 'profile', key: 'settings.profile' }, { id: 'look', key: 'settings.appearance' }, { id: 'front', key: 'settings.frontPage' },
-  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'sport', key: 'settings.sport' }, { id: 'account', key: 'settings.account' },
+  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'sport', key: 'settings.sport' },
   { id: 'invites', key: 'invites.title' },
 ]
 
-export default function Settings({ t, profile, update: persist, saving, saveError, userId, email }: Props) {
+// Header height plus a little: a section counts as being read once its top has scrolled under this.
+const TOP_LINE = 140
+
+export default function Settings({ t, profile, update: persist, saving, saveError, userId, email, sub }: Props) {
+  // Phones: a list of the sections first, then one section per page (#/settings/look), like the system
+  // settings on Android and iPhone; the phone's back button returns to the list. Computers: all sections, side menu.
+  const phone = useMedia('(max-width: 719px)')
+  const openId = SECTIONS.some((s) => s.id === sub) ? (sub as SectionId) : null
+  const shows = (id: SectionId) => !phone || openId === id
   const [active, setActive] = useState<SectionId>('profile')
   const refs = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
 
+  // The section being read is the last one whose top has passed a line just under the header. The last
+  // sections can never scroll up to that line, so over the last screen and a half of scrolling the line slides
+  // down to the bottom of the window: each of them gets its turn, and at the very bottom it is the last one.
+  // After a tap in the menu the tapped section stays marked until the person scrolls by hand, so the
+  // smooth scroll (or a short last section) does not move the mark somewhere else.
+  const pinned = useRef(false)
   useEffect(() => {
-    // Track every section in view (the callback only receives the ones that changed) and highlight the topmost.
-    const seen = new Set<SectionId>()
-    const obs = new IntersectionObserver((entries) => {
-      entries.forEach((e) => { const id = e.target.id as SectionId; if (e.isIntersecting) seen.add(id); else seen.delete(id) })
-      const first = SECTIONS.find((s) => seen.has(s.id))
-      if (first) setActive(first.id)
-    }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 })
-    Object.values(refs.current).forEach((el) => el && obs.observe(el))
-    return () => obs.disconnect()
+    let frame = 0
+    const update = () => {
+      frame = 0
+      if (pinned.current) return
+      const shown = SECTIONS.map((x) => refs.current[x.id]).filter((el): el is HTMLElement => !!el)
+      if (!shown.length) return
+      const vh = window.innerHeight
+      const left = document.documentElement.scrollHeight - (window.scrollY + vh)
+      const near = Math.min(1, Math.max(0, 1 - left / (vh * 1.5)))
+      const line = TOP_LINE + (vh - TOP_LINE - 40) * near
+      const current = left <= 2 ? shown[shown.length - 1] : [...shown].reverse().find((el) => el.getBoundingClientRect().top <= line) ?? shown[0]
+      setActive(current.id as SectionId)
+    }
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }
+    const unpin = () => { pinned.current = false }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) window.addEventListener(ev, unpin, { passive: true })
+    update()
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) window.removeEventListener(ev, unpin)
+    }
   }, [])
 
   // "Saved" flashes briefly after each save finishes (the profile hook only exposes `saving`).
@@ -59,107 +92,150 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
   }, [persist])
   useEffect(() => () => window.clearTimeout(flashTimer.current), [])
 
-  const jump = (id: SectionId) => { setActive(id); refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  const jump = (id: SectionId) => {
+    setActive(id)
+    refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    // set after the click's own mousedown has unpinned
+    pinned.current = true
+  }
   const reg = (id: SectionId) => (el: HTMLElement | null) => { refs.current[id] = el }
+  // A section address opened on a computer (a link from a phone, a widened window): go to that section.
+  // (after a moment, once the sources list above has loaded and stopped moving the page)
+  useEffect(() => {
+    if (phone || !openId) return
+    const timer = window.setTimeout(() => refs.current[openId]?.scrollIntoView({ block: 'start' }), 600)
+    return () => window.clearTimeout(timer)
+  }, [phone, openId])
 
   return (
+    <ShowSection.Provider value={shows}>
     <div className="settings-layout">
-      <nav className="settings-nav" aria-label={t('settings.title')}>
-        {SECTIONS.filter((s) => s.id !== 'invites' || profile.is_admin).map((s) => (
-          <button key={s.id} type="button" aria-current={active === s.id} onClick={() => jump(s.id)}>{t(s.key)}</button>
-        ))}
-      </nav>
+      {!phone && (
+        <nav className="settings-nav" aria-label={t('settings.title')}>
+          {SECTIONS.filter((s) => s.id !== 'invites' || profile.is_admin).map((s) => (
+            <button key={s.id} type="button" aria-current={active === s.id} onClick={() => jump(s.id)}>{t(s.key)}</button>
+          ))}
+        </nav>
+      )}
 
       <div className="settings-main">
         <div className="row">
-          <h1 style={{ margin: 0 }}>{t('settings.title')}</h1>
+          {phone && openId
+            ? <a className="settings-back" href={hrefFor('settings')}><BackIcon />{t('settings.title')}</a>
+            : <h1 style={{ margin: 0 }}>{t('settings.title')}</h1>}
           <span className="status" aria-live="polite">{saving ? t('settings.saving') : saveError ? t('error.generic') : savedFlash ? t('settings.saved') : ''}</span>
         </div>
 
+        {phone && !openId && (
+          <nav className="card settings-list" aria-label={t('settings.title')}>
+            {SECTIONS.filter((s) => s.id !== 'invites' || profile.is_admin).map((s) => (
+              <a key={s.id} href={hrefFor('settings', s.id)}>
+                <span className="grow"><b>{t(s.key)}</b><small>{t(`settings.sum.${s.id}` as Key)}</small></span>
+                <BackIcon className="chevron" />
+              </a>
+            ))}
+          </nav>
+        )}
+
+        {/* Profile and account are one section: name and language, the password, then who is signed in. */}
         <Section id="profile" ref={reg('profile')} title={t('settings.profile')} desc={t('settings.profileDesc')}>
-          <ProfileFields t={t} profile={profile} update={update} />
+          {/* Rows, like the switches on the front-page section: name, language, password, who is signed in. */}
+          <div className="pref-rows">
+            <ProfileFields t={t} profile={profile} update={update} />
+            <PasswordRow t={t} email={email} hasPassword={profile.has_password} onSet={() => update({ has_password: true })} />
+            <div className="pref-row">
+              {/* the address under the row name, so the button fits beside it on a phone */}
+              <span className="pref-label">{t('account.account')}<small className="pref-email">{email}</small></span>
+              <div className="pref-value">
+                {/* Per-tab caches (feed, links, weather…) carry no user id, so clear them for the next account on a shared device. */}
+                <button type="button" className="btn pair" title={t('settings.signOut')} onClick={() => { sessionStorage.clear(); void supabase.auth.signOut() }}>{t('account.signOutShort')}</button>
+              </div>
+            </div>
+          </div>
         </Section>
 
         <Section id="look" ref={reg('look')} title={t('settings.appearance')} desc={t('settings.appearanceDesc')}>
-          <div className="look-grid">
-            <div className="stack">
-              <Field label={t('settings.theme')}>
-                <Segmented<Theme> value={profile.theme} options={[['auto', t('theme.auto')], ['light', t('theme.light')], ['dark', t('theme.dark')]]} onChange={(v) => update({ theme: v })} />
-              </Field>
-              <Field label={t('settings.accent')}>
-                <div className="swatches" role="group" aria-label={t('settings.accent')}>
-                  {ACCENTS.map((a) => (
-                    <button key={a} type="button" className="swatch" data-accent={a} aria-pressed={profile.accent === a}
-                      aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
-                  ))}
-                  <CustomSwatch t={t} accent={profile.accent} saved={profile.accent_custom} onPick={(hex) => update({ accent: hex as `#${string}`, accent_custom: hex })} />
-                </div>
-              </Field>
-              <Field label={t('settings.layout')}>
-                <div className="option-cards">
-                  {LAYOUTS.map((l) => (
-                    <button key={l} type="button" className="option-card" aria-pressed={profile.layout === l} onClick={() => update({ layout: l })}>
-                      <LayoutGlyph layout={l} /><span>{t(`layout.${l}` as Key)}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              {/* the compact list never shows summaries: the switch reads off and rests, the saved choice is kept for the other layouts */}
-              <Toggle label={t('settings.showSummary')} on={profile.show_summary && profile.layout !== 'list'} disabled={profile.layout === 'list'} onChange={(v) => update({ show_summary: v })} />
-              <Field label={t('settings.font')}>
-                <div className="option-cards">
-                  {FONTS.map((f) => (
-                    <button key={f} type="button" className="option-card" aria-pressed={profile.font === f} data-font={f} onClick={() => update({ font: f })}>
-                      <span className="font-glyph">Aa</span><span>{t(`font.${f}` as Key)}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label={t('settings.background')}>
-                <div className="option-cards">
-                  {BACKGROUNDS.map((b) => (
-                    <button key={b} type="button" className="option-card" aria-pressed={profile.background === b} onClick={() => update({ background: b })}>
-                      <span className={`bg-glyph bg-${b}`} aria-hidden="true" /><span>{t(`bg.${b}` as Key)}</span>
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label={t('settings.textSize')}>
-                <Segmented<TextSize> value={profile.text_size} options={TEXT_SIZES.map((s) => [s, t(`size.${s}` as Key)] as [TextSize, string])} onChange={(v) => update({ text_size: v })} />
-              </Field>
-            </div>
-            <aside className="look-preview" aria-label={t('settings.preview')}>
-              <small className="muted">{t('settings.preview')}</small>
-              <Preview t={t} layout={profile.layout} showSummary={profile.show_summary} />
-            </aside>
+          {/* The preview first, as a band across the card, then one row per setting with its choices at the right end. */}
+          <aside className="look-preview" aria-label={t('settings.preview')}>
+            <small className="muted">{t('settings.preview')}</small>
+            <Preview t={t} layout={profile.layout} showSummary={profile.show_summary} />
+          </aside>
+          <div className="pref-rows">
+            <PrefRow label={t('settings.theme')} wide>
+              <Segmented<Theme> value={profile.theme} options={[['auto', t('theme.auto')], ['light', t('theme.light')], ['dark', t('theme.dark')]]} onChange={(v) => update({ theme: v })} />
+            </PrefRow>
+            <PrefRow label={t('settings.accent')} wide>
+              <div className="swatches" role="group" aria-label={t('settings.accent')}>
+                {ACCENTS.map((a) => (
+                  <button key={a} type="button" className="swatch" data-accent={a} aria-pressed={profile.accent === a}
+                    aria-label={t(`accent.${a}` as Key)} title={t(`accent.${a}` as Key)} onClick={() => update({ accent: a })} />
+                ))}
+                <CustomSwatch t={t} accent={profile.accent} saved={profile.accent_custom} onPick={(hex) => update({ accent: hex as `#${string}`, accent_custom: hex })} />
+              </div>
+            </PrefRow>
+            <PrefRow label={t('settings.background')} wide>
+              <div className="option-cards">
+                {BACKGROUNDS.map((b) => (
+                  <button key={b} type="button" className="option-card" aria-pressed={profile.background === b} onClick={() => update({ background: b })}>
+                    <span className={`bg-glyph bg-${b}`} aria-hidden="true" /><span>{t(`bg.${b}` as Key)}</span>
+                  </button>
+                ))}
+              </div>
+            </PrefRow>
+            <PrefRow label={t('settings.layout')} wide>
+              <div className="option-cards">
+                {LAYOUTS.map((l) => (
+                  <button key={l} type="button" className="option-card" aria-pressed={profile.layout === l} onClick={() => update({ layout: l })}>
+                    <LayoutGlyph layout={l} /><span>{t(`layout.${l}` as Key)}</span>
+                  </button>
+                ))}
+              </div>
+            </PrefRow>
+            {/* the compact list never shows summaries: the switch reads off and rests, the saved choice is kept for the other layouts */}
+            <SwitchRow id="sw-summary" label={t('settings.rowSummary')} sub under on={profile.show_summary && profile.layout !== 'list'} disabled={profile.layout === 'list'} onChange={(v) => update({ show_summary: v })} />
+            <PrefRow label={t('settings.font')} wide>
+              <div className="option-cards">
+                {FONTS.map((f) => (
+                  <button key={f} type="button" className="option-card" aria-pressed={profile.font === f} data-font={f} onClick={() => update({ font: f })}>
+                    <span className="font-glyph">Aa</span><span>{t(`font.${f}` as Key)}</span>
+                  </button>
+                ))}
+              </div>
+            </PrefRow>
+            <PrefRow label={t('settings.textSize')} wide>
+              <Segmented<TextSize> value={profile.text_size} options={TEXT_SIZES.map((s) => [s, t(`size.${s}` as Key)] as [TextSize, string])} onChange={(v) => update({ text_size: v })} />
+            </PrefRow>
           </div>
         </Section>
 
         <Section id="front" ref={reg('front')} title={t('settings.frontPage')} desc={t('settings.frontPageDesc')}>
-          <Toggle label={t('settings.showRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
-          {profile.show_rates && (
-            <Field label={t('settings.rateCurrencies')}>
-              <div className="seg seg-small">
-                {CURRENCIES.map((c) => {
-                  const on = profile.rate_currencies.includes(c)
-                  return (
-                    <button key={c} type="button" aria-pressed={on} disabled={on && profile.rate_currencies.length === 1}
-                      onClick={() => update({ rate_currencies: on ? profile.rate_currencies.filter((x) => x !== c) : [...CURRENCIES].filter((x) => x === c || profile.rate_currencies.includes(x)) })}>
-                      {c}
-                    </button>
-                  )
-                })}
-              </div>
-            </Field>
-          )}
-          <Toggle label={t('settings.showCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
-          <Toggle label={t('settings.showSearch')} on={profile.show_search} onChange={(v) => update({ show_search: v })} />
-          {profile.show_search && (
-            <Field label={t('settings.searchEngine')}>
-              <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
-            </Field>
-          )}
-          <Toggle label={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
+          {/* A switch per widget, and its own choices on the row under it while it is on. */}
+          <div className="pref-rows">
+            <SwitchRow id="sw-rates" label={t('settings.rowRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
+            {profile.show_rates && (
+              <PrefRow label={t('settings.rowCurrencies')} sub wide>
+                <div className="seg seg-small" role="group" aria-label={t('settings.rateCurrencies')}>
+                  {CURRENCIES.map((c) => {
+                    const on = profile.rate_currencies.includes(c)
+                    return (
+                      <button key={c} type="button" aria-pressed={on} disabled={on && profile.rate_currencies.length === 1}
+                        onClick={() => update({ rate_currencies: on ? profile.rate_currencies.filter((x) => x !== c) : [...CURRENCIES].filter((x) => x === c || profile.rate_currencies.includes(x)) })}>
+                        {c}
+                      </button>
+                    )
+                  })}
+                </div>
+              </PrefRow>
+            )}
+            <SwitchRow id="sw-calendar" label={t('settings.rowCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
+            <SwitchRow id="sw-search" label={t('settings.rowSearch')} on={profile.show_search} onChange={(v) => update({ show_search: v })} />
+            {profile.show_search && (
+              <PrefRow label={t('settings.rowEngine')} sub>
+                <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
+              </PrefRow>
+            )}
+            <SwitchRow id="sw-reader" label={t('settings.rowReader')} hint={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
+          </div>
         </Section>
 
         {/* Each section's description is one paragraph: what it does, then how to use it. */}
@@ -179,16 +255,6 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
           <SportTeams t={t} teams={profile.teams} onChange={(teams) => update({ teams })} />
         </Section>
 
-        <Section id="account" ref={reg('account')} title={t('settings.account')} desc={t('settings.signedInAs', { email })}>
-          <div className="two-col">
-            <PasswordForm t={t} email={email} hasPassword={profile.has_password} onSet={() => update({ has_password: true })} />
-            <div className="stack account-actions">
-              {/* Per-tab caches (feed, links, weather…) carry no user id, so clear them for the next account on a shared device. */}
-              <button type="button" className="btn" onClick={() => { sessionStorage.clear(); void supabase.auth.signOut() }}>{t('settings.signOut')}</button>
-            </div>
-          </div>
-        </Section>
-
         {profile.is_admin && (
           <Section id="invites" ref={reg('invites')} title={t('invites.title')} desc={t('invites.desc')}>
             <Invites t={t} lang={profile.language} selfId={userId} />
@@ -196,12 +262,17 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
         )}
       </div>
     </div>
+    </ShowSection.Provider>
   )
 }
 
 /* ---------- building blocks ---------- */
 
-function Section({ id, title, desc, children, ref }: { id: string; title: string; desc?: string; children: ReactNode; ref: (el: HTMLElement | null) => void }) {
+// Whether a section is on screen: all of them on a computer, only the open one on a phone.
+const ShowSection = createContext<(id: SectionId) => boolean>(() => true)
+
+function Section({ id, title, desc, children, ref }: { id: SectionId; title: string; desc?: string; children: ReactNode; ref: (el: HTMLElement | null) => void }) {
+  if (!useContext(ShowSection)(id)) return null
   return (
     <section id={id} ref={ref} className="card section" aria-labelledby={`h-${id}`}>
       <div className="section-head">
@@ -255,14 +326,28 @@ function CustomSwatch({ t, accent, saved, onPick }: { t: T; accent: string; save
   )
 }
 
-function Toggle({ label, on, onChange, hint, disabled }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string; disabled?: boolean }) {
+// One settings row: its name (and a short hint) on the left, the control after it. "sub" marks the
+// choices of the row above (currencies under the rates switch), shown with a quieter name.
+// "wide" lets a long control (five currencies) take a line of its own under the name on a phone.
+// "under": a sub-row that sits in the control column, under the choices it belongs to (the summary switch under the layout cards).
+function PrefRow({ label, hint, sub, wide, under, disabled, htmlFor, children }: { label: string; hint?: string; sub?: boolean; wide?: boolean; under?: boolean; disabled?: boolean; htmlFor?: string; children: ReactNode }) {
+  const Name = htmlFor ? 'label' : 'span'
   return (
-    <div className="toggle-row" aria-disabled={disabled || undefined} onClick={() => { if (!disabled) onChange(!on) }}>
-      <div className="grow">{label}{hint && <small>{hint}</small>}</div>
-      <button type="button" role="switch" className="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={(e) => { e.stopPropagation(); onChange(!on) }} />
+    <div className={`pref-row${sub ? ' pref-sub' : ''}${wide ? ' pref-wide' : ''}${under ? ' pref-under' : ''}`} aria-disabled={disabled || undefined}>
+      <Name className="pref-label" htmlFor={htmlFor}>{label}{hint && <small className="pref-email">{hint}</small>}</Name>
+      <div className="pref-value">{children}</div>
     </div>
   )
 }
+
+function SwitchRow({ id, label, hint, sub, under, on, disabled, onChange }: { id: string; label: string; hint?: string; sub?: boolean; under?: boolean; on: boolean; disabled?: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <PrefRow label={label} hint={hint} sub={sub} under={under} htmlFor={id} disabled={disabled}>
+      <button id={id} type="button" role="switch" className="switch" aria-checked={on} disabled={disabled} onClick={() => onChange(!on)} />
+    </PrefRow>
+  )
+}
+
 
 function LayoutGlyph({ layout }: { layout: Layout }) {
   return (
@@ -285,7 +370,8 @@ function LayoutGlyph({ layout }: { layout: Layout }) {
 }
 
 // A small news page in the chosen layout, drawn at a desktop-like width and zoomed to fit the column, so cards, magazine and list look as they will on the front page.
-const PREVIEW_WIDTH = 640
+// Drawn wider than its frame and zoomed down, so a whole row of stories fits in the short sticky strip.
+const PREVIEW_WIDTH = 960
 const PREVIEW_ITEMS: { title: Key; summary: Key; source: string; hue: number }[] = [
   { title: 'settings.previewTitle', summary: 'settings.previewSummary', source: 'Digi24', hue: 0 },
   { title: 'settings.previewTitle2', summary: 'settings.previewSummary2', source: 'HotNews', hue: 1 },
@@ -339,17 +425,22 @@ function ProfileFields({ t, profile, update }: { t: T; profile: Profile; update:
   const [name, setName] = useState(profile.display_name ?? '')
   useEffect(() => setName(profile.display_name ?? ''), [profile.display_name])
   return (
-    <div className="two-col">
-      <label className="field">
-        <span>{t('settings.name')}</span>
-        <input className="input" value={name} autoComplete="name" enterKeyHint="done" onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
-          onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
-      </label>
-      <Field label={t('settings.language')}>
-        <Segmented value={profile.language} options={[['en', 'English'], ['ro', 'Română']]} onChange={(v) => update({ language: v })} />
-      </Field>
-    </div>
+    <>
+      <div className="pref-row">
+        <label className="pref-label" htmlFor="pref-name">{t('settings.name')}</label>
+        <div className="pref-value">
+          <input id="pref-name" className="input" value={name} autoComplete="name" enterKeyHint="done" onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            onBlur={() => name.trim() !== (profile.display_name ?? '') && update({ display_name: name.trim() || null })} />
+        </div>
+      </div>
+      <div className="pref-row">
+        <span className="pref-label">{t('settings.language')}</span>
+        <div className="pref-value">
+          <Segmented value={profile.language} options={[['en', 'English'], ['ro', 'Română']]} onChange={(v) => update({ language: v })} />
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -485,7 +576,9 @@ function Sources({ t, userId }: { t: T; userId: string }) {
 
   const custom = mine.filter((m) => !m.default_source_id)
   const sections = useMemo(() => CATEGORY_ORDER.filter((c) => c === 'custom' ? custom.length > 0 : defaults.some((d) => d.category === c)), [defaults, custom.length])
+  // Alphabetical, so a source is found by name; the chips above group by category when wanted.
   const shown = defaults.filter((d) => (section === 'all' || d.category === section) && (lang === 'all' || d.language === lang))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ro', { sensitivity: 'base' }))
   const showCustom = (section === 'all' || section === 'custom') && custom.length > 0
   const activeCount = defaults.filter(isOn).length + custom.filter((m) => m.enabled).length
 
@@ -564,23 +657,32 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
     return () => { window.clearTimeout(timer); ctrl.abort() }
   }, [q, profile.language])
 
+  const { data: forecast } = useForecast(profile.weather_lat, profile.weather_lon)
   // Results show only while there is something to search for; picking a city clears the field.
   const shown = q.trim().length >= 2 ? results : null
   return (
-    <div className="stack picker">
-      {profile.weather_city ? (
-        <div className="src-card">
-          <WeatherIcon code={0} className="src-icon" />
-          <div className="grow"><b>{profile.weather_city}</b></div>
-          <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
-            onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
+    <div className="pref-rows">
+      {/* the chosen city as a row like a followed team: the weather there right now, name, remove at the right */}
+      {profile.weather_city && (
+        <div className="pref-row">
+          <span className="pref-label team-row">
+            <WeatherIcon code={forecast?.current.weather_code ?? 0} isDay={forecast ? forecast.current.is_day === 1 : true} className="team-crest" />
+            {profile.weather_city}
+            {forecast && <span className="muted pref-temp">{Math.round(forecast.current.temperature_2m)}°</span>}
+          </span>
+          <div className="pref-value">
+            <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
+              onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
+          </div>
         </div>
-      ) : null}
-      <input className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.weatherCity')} placeholder={t('settings.weatherCity')}
-        value={q} onChange={(e) => setQ(e.target.value)} />
-      {shown && shown.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.weatherNone')}</p>}
+      )}
+      <PrefRow label={t('settings.searchLabel')} htmlFor="weather-q">
+        <input id="weather-q" className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" placeholder={t('settings.weatherCity')}
+          value={q} onChange={(e) => setQ(e.target.value)} />
+      </PrefRow>
+      {shown && shown.length === 0 && <p className="muted pref-note">{t('settings.weatherNone')}</p>}
       {shown && shown.length > 0 && (
-        <div className="results">
+        <div className="results pref-note">
           {shown.map((r) => (
             <button key={r.id} type="button" onClick={() => { update({ weather_city: r.name, weather_lat: r.latitude, weather_lon: r.longitude }); setResults(null); setQ('') }}>
               {r.name}{r.admin1 ? `, ${r.admin1}` : ''}{r.country ? ` · ${r.country}` : ''}
@@ -621,24 +723,30 @@ function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (te
   const full = teams.length >= MAX_TEAMS
 
   return (
-    <div className="stack picker">
+    <div className="pref-rows">
       {teams.map((team) => (
-        <div key={team.id} className="src-card">
-          {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
-          <div className="grow"><b>{team.name}</b></div>
-          <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
-            onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
+        <div key={team.id} className="pref-row">
+          <span className="pref-label team-row">
+            {team.crest ? <img className="team-crest" src={team.crest} alt="" referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.style.visibility = 'hidden' }} /> : <span className="team-crest" />}
+            {team.name}
+          </span>
+          <div className="pref-value">
+            <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
+              onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
+          </div>
         </div>
       ))}
-      {full ? <p className="muted" style={{ margin: 0 }}>{t('settings.sportMax', { n: MAX_TEAMS })}</p> : (
-        <input className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" aria-label={t('settings.sportSearch')} placeholder={t('settings.sportSearch')}
-          value={q} onFocus={ensureOptions} onChange={(e) => { setQ(e.target.value); void ensureOptions() }} />
+      {full ? <p className="muted pref-note">{t('settings.sportMax', { n: MAX_TEAMS })}</p> : (
+        <PrefRow label={t('settings.searchLabel')} htmlFor="team-q">
+          <input id="team-q" className="input" type="text" inputMode="search" enterKeyHint="search" autoComplete="off" placeholder={t('settings.sportSearch')}
+            value={q} onFocus={ensureOptions} onChange={(e) => { setQ(e.target.value); void ensureOptions() }} />
+        </PrefRow>
       )}
-      {state === 'loading' && query && <p className="muted" style={{ margin: 0 }}>{t('settings.sportLoading')}</p>}
-      {state === 'error' && <p className="muted" style={{ margin: 0 }}>{t('settings.sportUnavailable')}</p>}
-      {options && query.length >= 2 && results.length === 0 && <p className="muted" style={{ margin: 0 }}>{t('settings.sportNone')}</p>}
+      {state === 'loading' && query && <p className="muted pref-note">{t('settings.sportLoading')}</p>}
+      {state === 'error' && <p className="muted pref-note">{t('settings.sportUnavailable')}</p>}
+      {options && query.length >= 2 && results.length === 0 && <p className="muted pref-note">{t('settings.sportNone')}</p>}
       {results.length > 0 && (
-        <div className="results">
+        <div className="results pref-note">
           {results.map((o) => (
             <button key={o.id} type="button" onClick={() => { onChange([...teams, { id: o.id, name: o.name, tla: o.tla, crest: o.crest }]); setQ('') }}>
               {o.name}{o.area ? ` · ${o.area}` : ''}
@@ -650,18 +758,57 @@ function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (te
   )
 }
 
-function PasswordForm({ t, email, hasPassword, onSet }: { t: T; email: string; hasPassword: boolean; onSet: () => void }) {
+// Signed in through the email link (or a reset) in the last few minutes: that proves the person owns the
+// address, so a new password can be set without the old one. Read from the session token's "amr" claim.
+const FRESH_LINK_MS = 15 * 60_000
+function signedInByLinkRecently(accessToken: string | undefined): boolean {
+  try {
+    const payload = JSON.parse(atob(accessToken!.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return (payload.amr ?? []).some((m: { method: string; timestamp: number }) =>
+      ['otp', 'magiclink', 'recovery'].includes(m.method) && Date.now() - m.timestamp * 1000 < FRESH_LINK_MS)
+  } catch { return false }
+}
+
+// The password row: its state and one button; the form opens under it only when needed. After an email
+// link sign-in it opens by itself, since that is usually why the person came.
+function PasswordRow({ t, email, hasPassword, onSet }: { t: T; email: string; hasPassword: boolean; onSet: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    void supabase.auth.getSession().then(({ data }) => { if (signedInByLinkRecently(data.session?.access_token)) setOpen(true) })
+  }, [])
+  return (
+    <div className="pref-row">
+      <span className="pref-label">{t('account.password')}</span>
+      <div className="pref-value">
+        {/* a status, not a control: a flat grey pill with no border, unlike the button beside it */}
+        {saved ? <span className="muted">{t('account.passwordSaved')}</span>
+          : <span className="status-pill pair">{hasPassword ? t('account.passwordIsSet') : t('account.passwordNotSet')}</span>}
+        {!open && <button type="button" className="btn pair" onClick={() => { setOpen(true); setSaved(false) }}>{hasPassword ? t('account.change') : t('account.set')}</button>}
+      </div>
+      {open && (
+        <PasswordForm t={t} email={email} hasPassword={hasPassword}
+          onSet={onSet} onDone={() => { setOpen(false); setSaved(true) }} onCancel={() => setOpen(false)} />
+      )}
+    </div>
+  )
+}
+
+function PasswordForm({ t, email, hasPassword, onSet, onDone, onCancel }: { t: T; email: string; hasPassword: boolean; onSet: () => void; onDone: () => void; onCancel: () => void }) {
   const [current, setCurrent] = useState('')
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [viaLink, setViaLink] = useState(false)
+  useEffect(() => { void supabase.auth.getSession().then(({ data }) => setViaLink(signedInByLinkRecently(data.session?.access_token))) }, [])
+  const needCurrent = hasPassword && !viaLink
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (pw !== pw2) { setMsg({ ok: false, text: t('account.passwordMismatch') }); return }
     setBusy(true); setMsg(null)
-    if (hasPassword) {
+    if (needCurrent) {
       // Re-authenticate with the current password before changing it.
       const { error } = await supabase.auth.signInWithPassword({ email, password: current })
       if (error) { setBusy(false); setMsg({ ok: false, text: t('account.wrongCurrent') }); return }
@@ -669,25 +816,50 @@ function PasswordForm({ t, email, hasPassword, onSet }: { t: T; email: string; h
     const { error } = await supabase.auth.updateUser({ password: pw })
     setBusy(false)
     if (error) { setMsg({ ok: false, text: /different/i.test(error.message) ? t('account.passwordSame') : t('error.generic') }); return }
-    setMsg({ ok: true, text: t('account.passwordSaved') }); setCurrent(''); setPw(''); setPw2('')
+    setCurrent(''); setPw(''); setPw2('')
     if (!hasPassword) onSet()
+    onDone()
+  }
+
+  // Forgot the current one: the sign-in link by email, after which the old password is not asked for.
+  async function sendLink() {
+    setBusy(true); setMsg(null)
+    const redirect = new URL(import.meta.env.BASE_URL, window.location.origin).toString()
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect, shouldCreateUser: false } })
+    setBusy(false)
+    setMsg(error ? { ok: false, text: t(error.status === 429 ? 'login.wait' : 'error.generic') } : { ok: true, text: t('account.linkSent') })
   }
 
   return (
-    <form className="stack" onSubmit={submit}>
+    <form className="password-form" onSubmit={submit}>
       {/* Lets password managers tie the new password to this account; not shown. */}
       <input className="visually-hidden" type="email" autoComplete="username" value={email} readOnly tabIndex={-1} aria-hidden="true" />
-      <div>
-        <b>{hasPassword ? t('account.changePassword') : t('account.setPassword')}</b>
-        <div className="muted" style={{ fontSize: '.92em' }}>{hasPassword ? t('account.hasPassword') : t('account.setPasswordDesc')}</div>
-      </div>
-      {hasPassword && (
-        <input className="input" type="password" autoComplete="current-password" required placeholder={t('account.currentPassword')} value={current} onChange={(e) => setCurrent(e.target.value)} />
+      {/* the row above already says a password is set; a hint only when there is something to add */}
+      {(!hasPassword || viaLink) && <div className="muted hint">{!hasPassword ? t('account.setPasswordDesc') : t('account.viaLink')}</div>}
+      {/* not a <label> around both: a click on the label text must focus the field, not press the button */}
+      {needCurrent && (
+        <div className="field">
+          <div className="field-head">
+            <label htmlFor="pw-current">{t('account.currentPassword')}</label>
+            <button className="link-btn" type="button" disabled={busy} onClick={sendLink}>{t('account.forgot')}</button>
+          </div>
+          <input id="pw-current" className="input" type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} />
+        </div>
       )}
-      <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.newPassword')} value={pw} onChange={(e) => setPw(e.target.value)} />
-      <input className="input" type="password" autoComplete="new-password" minLength={8} required placeholder={t('account.confirmPassword')} value={pw2} onChange={(e) => setPw2(e.target.value)} />
-      {msg && <div className={`msg ${msg.ok ? '' : 'error'}`}>{msg.text}</div>}
-      <div><button className="btn primary" type="submit" disabled={busy}>{t('account.save')}</button></div>
+      <label className="field">
+        <span>{t('account.newPassword')}</span>
+        <input className="input" type="password" autoComplete="new-password" minLength={8} required aria-describedby="pw-rule" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <small id="pw-rule" className="muted">{t('account.passwordRule')}</small>
+      </label>
+      <label className="field">
+        <span>{t('account.confirmPassword')}</span>
+        <input className="input" type="password" autoComplete="new-password" minLength={8} required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+      </label>
+      {msg && <div className={`msg ${msg.ok ? '' : 'error'}`} role="status">{msg.text}</div>}
+      <div className="row">
+        <button className="btn primary" type="submit" disabled={busy}>{t('account.save')}</button>
+        <button className="btn ghost" type="button" onClick={onCancel}>{t('account.cancel')}</button>
+      </div>
     </form>
   )
 }

@@ -6,7 +6,8 @@ export type Route = { name: RouteName; param?: string }
 function parse(hash: string): Route {
   const h = hash.replace(/^#\/?/, '')
   if (h.startsWith('saved')) return { name: 'saved' }
-  if (h.startsWith('settings')) return { name: 'settings' }
+  const settings = h.match(/^settings(?:\/([a-z]+))?/)
+  if (settings) return { name: 'settings', param: settings[1] }
   const read = h.match(/^read\/([^/?#]+)/)
   if (read) return { name: 'read', param: decodeURIComponent(read[1]) }
   return { name: 'feed' }

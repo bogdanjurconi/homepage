@@ -1,34 +1,12 @@
-import { useEffect, useState } from 'react'
 import type { Key, T } from '../lib/i18n'
 import type { Language } from '../lib/types'
 import WeatherIcon from './WeatherIcon'
+import { useForecast } from '../hooks/useForecast'
 
 type Props = { lat: number; lon: number; city: string | null; lang: Language; t: T }
 
-type Forecast = {
-  current: { temperature_2m: number; apparent_temperature: number; weather_code: number; wind_speed_10m: number; relative_humidity_2m: number; is_day: number }
-  daily: { time: string[]; weather_code: number[]; temperature_2m_max: number[]; temperature_2m_min: number[]; precipitation_probability_max: (number | null)[] }
-}
-
-const CACHE_KEY = 'homepage.weather.v3'
-
 export default function WeatherCard({ lat, lon, city, lang, t }: Props) {
-  const [data, setData] = useState<Forecast | null>(() => {
-    try { const c = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? 'null'); return c && c.key === `${lat},${lon}` && Date.now() - c.at < 20 * 60_000 && c.data?.current ? c.data : null } catch { return null }
-  })
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    if (data) return
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,is_day` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4`
-    fetch(url).then((r) => r.json()).then((d: Forecast) => {
-      if (!d?.current || !d?.daily?.time) throw new Error('bad forecast')
-      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ key: `${lat},${lon}`, at: Date.now(), data: d }))
-      setData(d)
-    }).catch(() => setError(true))
-  }, [lat, lon, data])
+  const { data, error } = useForecast(lat, lon)
 
   if (error) return <section className="card weather weather-empty muted">{t('weather.error')}</section>
   if (!data) return <section className="card weather weather-empty muted" aria-busy="true">…</section>
