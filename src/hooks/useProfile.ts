@@ -41,13 +41,17 @@ export function useProfile(userId: string | undefined) {
     // the server copy replaces it when it arrives.
     const cached = readCache(userId)
     if (cached) setProfile(cached)
-    supabase.from('profiles').select('*').eq('id', userId).maybeSingle().then(async ({ data }) => {
+    supabase.from('profiles').select('*').eq('id', userId).maybeSingle().then(async ({ data, error }) => {
       if (cancelled) return
+      // A failed request (offline, 5xx) is not "no profile yet": keep the cached copy instead of writing defaults.
+      if (error) return
       const pending = takePendingLanguage()
       if (data) {
         const loaded: Profile = { ...DEFAULT_PROFILE, ...(data as Profile), ...(pending ? { language: pending } : {}) }
         if (!Array.isArray(loaded.teams)) loaded.teams = []
-        setProfile(loaded); localStorage.setItem(CACHE_KEY, JSON.stringify(loaded))
+        if (!Array.isArray(loaded.source_order)) loaded.source_order = []
+        // A change made while this was loading is newer than the server copy: keep it.
+        if (inflight.current === 0) { setProfile(loaded); localStorage.setItem(CACHE_KEY, JSON.stringify(loaded)) }
         if (pending && pending !== (data as Profile).language) await supabase.from('profiles').update({ language: pending }).eq('id', userId)
         return
       }

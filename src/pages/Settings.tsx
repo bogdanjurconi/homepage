@@ -10,7 +10,7 @@ import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { CURRENCIES, MAX_TEAMS, type SportTeamOption, type Team } from '../lib/types'
 import { faviconFor } from '../components/QuickLinks'
-import { StarIcon, BookIcon, BackIcon } from '../components/Icons'
+import { StarIcon, BookIcon, BackIcon, ArrowUpIcon, ArrowDownIcon, CloseIcon } from '../components/Icons'
 import { useMedia } from '../hooks/useMedia'
 import WeatherIcon from '../components/WeatherIcon'
 import { useForecast } from '../hooks/useForecast'
@@ -31,7 +31,7 @@ function normalizeUrl(raw: string): string | null {
 type SectionId = 'profile' | 'look' | 'front' | 'links' | 'sources' | 'weather' | 'sport' | 'invites'
 const SECTIONS: { id: SectionId; key: Key }[] = [
   { id: 'profile', key: 'settings.profile' }, { id: 'look', key: 'settings.appearance' }, { id: 'front', key: 'settings.frontPage' },
-  { id: 'links', key: 'links.title' }, { id: 'sources', key: 'settings.sources' }, { id: 'weather', key: 'settings.weather' }, { id: 'sport', key: 'settings.sport' },
+  { id: 'links', key: 'links.title' }, { id: 'weather', key: 'settings.weather' }, { id: 'sport', key: 'settings.sport' }, { id: 'sources', key: 'settings.sources' },
   { id: 'invites', key: 'invites.title' },
 ]
 
@@ -99,6 +99,8 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
     pinned.current = true
   }
   const reg = (id: SectionId) => (el: HTMLElement | null) => { refs.current[id] = el }
+  // loaded as soon as the Sources layout is chosen, so the custom order list is ready when asked for
+  const orderSources = useEnabledSources(userId, profile.layout === 'bysource')
   // A section address opened on a computer (a link from a phone, a widened window): go to that section.
   // (after a moment, once the sources list above has loaded and stopped moving the page)
   useEffect(() => {
@@ -122,7 +124,7 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
         <div className="row">
           {phone && openId
             ? <a className="settings-back" href={hrefFor('settings')}><BackIcon />{t('settings.title')}</a>
-            : <h1 style={{ margin: 0 }}>{t('settings.title')}</h1>}
+            : <h1>{t('settings.title')}</h1>}
           <span className="status" aria-live="polite">{saving ? t('settings.saving') : saveError ? t('error.generic') : savedFlash ? t('settings.saved') : ''}</span>
         </div>
 
@@ -157,7 +159,6 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
         <Section id="look" ref={reg('look')} title={t('settings.appearance')} desc={t('settings.appearanceDesc')}>
           {/* The preview first, as a band across the card, then one row per setting with its choices at the right end. */}
           <aside className="look-preview" aria-label={t('settings.preview')}>
-            <small className="muted">{t('settings.preview')}</small>
             <Preview t={t} layout={profile.layout} showSummary={profile.show_summary} />
           </aside>
           <div className="pref-rows">
@@ -183,7 +184,7 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
               </div>
             </PrefRow>
             <PrefRow label={t('settings.layout')} wide>
-              <div className="option-cards">
+              <div className="option-cards four">
                 {LAYOUTS.map((l) => (
                   <button key={l} type="button" className="option-card" aria-pressed={profile.layout === l} onClick={() => update({ layout: l })}>
                     <LayoutGlyph layout={l} /><span>{t(`layout.${l}` as Key)}</span>
@@ -193,6 +194,30 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
             </PrefRow>
             {/* the compact list never shows summaries: the switch reads off and rests, the saved choice is kept for the other layouts */}
             <SwitchRow id="sw-summary" label={t('settings.rowSummary')} sub under on={profile.show_summary && profile.layout !== 'list'} disabled={profile.layout === 'list'} onChange={(v) => update({ show_summary: v })} />
+            {/* How the stories are shared between sources, in one full-width row under the layout: a slider for
+                the mixed layouts (cards, magazine, compact), the order of the rows for the Sources layout. */}
+            {profile.layout !== 'bysource' ? (
+              <div className="pref-row pref-full">
+                <label className="pref-label" htmlFor="mix-balance">{t('settings.mixBalance')}</label>
+                <div className="range-block">
+                  <div className="range-marks" aria-hidden="true"><span>{t('settings.mixEqual')}</span><span>{t('settings.mixMid')}</span><span>{t('settings.mixVolume')}</span></div>
+                  <input id="mix-balance" type="range" min={0} max={4} step={1} value={profile.mix_balance} list="mix-stops"
+                    aria-valuetext={[t('settings.mixEqual'), '', t('settings.mixMid'), '', t('settings.mixVolume')][profile.mix_balance]}
+                    onChange={(e) => update({ mix_balance: Number(e.target.value) })} />
+                  <datalist id="mix-stops"><option value="0" /><option value="1" /><option value="2" /><option value="3" /><option value="4" /></datalist>
+                </div>
+              </div>
+            ) : (
+              <div className="pref-row pref-full">
+                <div className="pref-full-head">
+                  <span className="pref-label">{t('settings.sourceSort')}</span>
+                  <Segmented<'alpha' | 'custom'> value={profile.source_sort} options={[['alpha', t('settings.sortAlpha')], ['custom', t('settings.sortCustom')]]} onChange={(v) => update({ source_sort: v })} />
+                </div>
+                {profile.source_sort === 'custom' && (
+                  <SourceOrder t={t} sources={orderSources} order={profile.source_order} onChange={(source_order) => update({ source_order })} />
+                )}
+              </div>
+            )}
             <PrefRow label={t('settings.font')} wide>
               <div className="option-cards">
                 {FONTS.map((f) => (
@@ -211,10 +236,17 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
         <Section id="front" ref={reg('front')} title={t('settings.frontPage')} desc={t('settings.frontPageDesc')}>
           {/* A switch per widget, and its own choices on the row under it while it is on. */}
           <div className="pref-rows">
+            <SwitchRow id="sw-search" label={t('settings.rowSearch')} on={profile.show_search} onChange={(v) => update({ show_search: v })} />
+            {profile.show_search && (
+              <PrefRow label={t('settings.rowEngine')} sub wide fill>
+                <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
+              </PrefRow>
+            )}
+            <SwitchRow id="sw-calendar" label={t('settings.rowCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
             <SwitchRow id="sw-rates" label={t('settings.rowRates')} on={profile.show_rates} onChange={(v) => update({ show_rates: v })} />
             {profile.show_rates && (
-              <PrefRow label={t('settings.rowCurrencies')} sub wide>
-                <div className="seg seg-small" role="group" aria-label={t('settings.rateCurrencies')}>
+              <PrefRow label={t('settings.rowCurrencies')} sub wide fill>
+                <div className="seg" role="group" aria-label={t('settings.rateCurrencies')}>
                   {CURRENCIES.map((c) => {
                     const on = profile.rate_currencies.includes(c)
                     return (
@@ -227,13 +259,6 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
                 </div>
               </PrefRow>
             )}
-            <SwitchRow id="sw-calendar" label={t('settings.rowCalendar')} on={profile.show_calendar} onChange={(v) => update({ show_calendar: v })} />
-            <SwitchRow id="sw-search" label={t('settings.rowSearch')} on={profile.show_search} onChange={(v) => update({ show_search: v })} />
-            {profile.show_search && (
-              <PrefRow label={t('settings.rowEngine')} sub>
-                <Segmented<SearchEngine> value={profile.search_engine} options={SEARCH_ENGINES.map((e) => [e, t(`engine.${e}` as Key)] as [SearchEngine, string])} onChange={(v) => update({ search_engine: v })} />
-              </PrefRow>
-            )}
             <SwitchRow id="sw-reader" label={t('settings.rowReader')} hint={t('settings.openInReader')} on={profile.open_in_reader} onChange={(v) => update({ open_in_reader: v })} />
           </div>
         </Section>
@@ -243,16 +268,16 @@ export default function Settings({ t, profile, update: persist, saving, saveErro
           <Links t={t} userId={userId} />
         </Section>
 
-        <Section id="sources" ref={reg('sources')} title={t('settings.sources')} desc={t('settings.sourcesLead')}>
-          <Sources t={t} userId={userId} />
-        </Section>
-
         <Section id="weather" ref={reg('weather')} title={t('settings.weather')} desc={`${t('settings.weatherDesc')} ${t('settings.weatherLead')}`}>
           <Weather t={t} profile={profile} update={update} />
         </Section>
 
         <Section id="sport" ref={reg('sport')} title={t('settings.sport')} desc={`${t('settings.sportDesc')} ${t('settings.sportLead')}`}>
           <SportTeams t={t} teams={profile.teams} onChange={(teams) => update({ teams })} />
+        </Section>
+
+        <Section id="sources" ref={reg('sources')} title={t('settings.sources')} desc={t('settings.sourcesLead')}>
+          <Sources t={t} userId={userId} />
         </Section>
 
         {profile.is_admin && (
@@ -288,6 +313,55 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   return <div className="field"><span>{label}</span>{children}</div>
 }
 
+// The sources on the front page, as the feeds function picks them: a default source unless switched off,
+// plus the person's own enabled ones. Read straight from the two tables (fast), not through the feeds function.
+function useEnabledSources(userId: string, active: boolean) {
+  const [sources, setSources] = useState<{ url: string; name: string }[] | null>(null)
+  useEffect(() => {
+    if (!active || sources) return
+    let cancelled = false
+    void Promise.all([
+      supabase.from('default_sources').select('id,name,url,enabled_by_default'),
+      supabase.from('user_sources').select('default_source_id,name,url,enabled').eq('user_id', userId),
+    ]).then(([{ data: defaults }, { data: mine }]) => {
+      if (cancelled) return
+      const own = mine ?? []
+      const list = (defaults ?? [])
+        .filter((d) => own.find((o) => o.default_source_id === d.id)?.enabled ?? d.enabled_by_default)
+        .map((d) => ({ url: d.url as string, name: d.name as string }))
+      for (const o of own) if (!o.default_source_id && o.enabled && o.url) list.push({ url: o.url, name: o.name || hostname(o.url) })
+      setSources(list)
+    })
+    return () => { cancelled = true }
+  }, [userId, active, sources])
+  return sources
+}
+
+// The person's own order of source rows, each with up and down.
+function SourceOrder({ t, sources, order, onChange }: { t: T; sources: { url: string; name: string }[] | null; order: string[]; onChange: (order: string[]) => void }) {
+  if (!sources) return <p className="muted pref-note">…</p>
+  const rank = (url: string) => { const i = order.indexOf(url); return i < 0 ? Infinity : i }
+  const list = [...sources].sort((a, b) => rank(a.url) - rank(b.url) || a.name.localeCompare(b.name, 'ro', { sensitivity: 'base' }))
+  const move = (i: number, dir: -1 | 1) => {
+    const urls = list.map((s) => s.url)
+    ;[urls[i], urls[i + dir]] = [urls[i + dir], urls[i]]
+    onChange(urls)
+  }
+  return (
+    <div className="order-list">
+      <ol>
+        {list.map((s, i) => (
+          <li key={s.url}>
+            <span className="grow">{s.name}</span>
+            <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUpIcon /></button>
+            <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === list.length - 1} onClick={() => move(i, 1)}><ArrowDownIcon /></button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function Segmented<V extends string>({ value, options, onChange }: { value: V; options: [V, string][]; onChange: (v: V) => void }) {
   return (
     <div className="seg">
@@ -316,11 +390,12 @@ function CustomSwatch({ t, accent, saved, onPick }: { t: T; accent: string; save
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => { onPick(hex); setLive(null) }, 500)
   }
-  if (!active && live == null && saved) return (
-    <button type="button" className="swatch custom" aria-pressed={false} aria-label={t('accent.custom')} title={t('accent.custom')} style={style} onClick={() => onPick(saved)} />
-  )
+  // One element in both states, so focus stays put. While a preset is chosen and a colour is saved, a tap
+  // brings that colour back instead of opening the picker.
+  const restore = !active && live == null && saved
   return (
-    <label className={`swatch custom${active || live != null ? ' on' : ''}`} title={t('accent.custom')} style={style}>
+    <label className={`swatch custom${active || live != null ? ' on' : ''}`} title={t('accent.custom')} style={style}
+      onClick={(e) => { if (restore) { e.preventDefault(); onPick(saved) } }}>
       <input type="color" className="visually-hidden" aria-label={t('accent.custom')} value={shown ?? '#24518f'} onChange={(e) => pick(e.target.value)} />
     </label>
   )
@@ -330,10 +405,11 @@ function CustomSwatch({ t, accent, saved, onPick }: { t: T; accent: string; save
 // choices of the row above (currencies under the rates switch), shown with a quieter name.
 // "wide" lets a long control (five currencies) take a line of its own under the name on a phone.
 // "under": a sub-row that sits in the control column, under the choices it belongs to (the summary switch under the layout cards).
-function PrefRow({ label, hint, sub, wide, under, disabled, htmlFor, children }: { label: string; hint?: string; sub?: boolean; wide?: boolean; under?: boolean; disabled?: boolean; htmlFor?: string; children: ReactNode }) {
+// "fill": the pills share one fixed band (390px on a computer, the whole line on a phone), equal widths.
+function PrefRow({ label, hint, sub, wide, under, fill, disabled, htmlFor, children }: { label: string; hint?: string; sub?: boolean; wide?: boolean; under?: boolean; fill?: boolean; disabled?: boolean; htmlFor?: string; children: ReactNode }) {
   const Name = htmlFor ? 'label' : 'span'
   return (
-    <div className={`pref-row${sub ? ' pref-sub' : ''}${wide ? ' pref-wide' : ''}${under ? ' pref-under' : ''}`} aria-disabled={disabled || undefined}>
+    <div className={`pref-row${sub ? ' pref-sub' : ''}${wide ? ' pref-wide' : ''}${under ? ' pref-under' : ''}${fill ? ' pref-fill' : ''}`} aria-disabled={disabled || undefined}>
       <Name className="pref-label" htmlFor={htmlFor}>{label}{hint && <small className="pref-email">{hint}</small>}</Name>
       <div className="pref-value">{children}</div>
     </div>
@@ -360,6 +436,12 @@ function LayoutGlyph({ layout }: { layout: Layout }) {
         <rect x="2" y="2" width="44" height="18" rx="2" />
         <rect x="2" y="24" width="13" height="10" rx="2" /><rect x="17.5" y="24" width="13" height="10" rx="2" /><rect x="33" y="24" width="13" height="10" rx="2" />
       </>}
+      {layout === 'bysource' && <>
+        <rect x="2" y="2" width="20" height="4" rx="1.5" />
+        <rect x="2" y="8" width="13" height="9" rx="2" /><rect x="17.5" y="8" width="13" height="9" rx="2" /><rect x="33" y="8" width="13" height="9" rx="2" opacity=".5" />
+        <rect x="2" y="21" width="20" height="4" rx="1.5" />
+        <rect x="2" y="27" width="13" height="9" rx="2" /><rect x="17.5" y="27" width="13" height="9" rx="2" /><rect x="33" y="27" width="13" height="9" rx="2" opacity=".5" />
+      </>}
       {layout === 'list' && <>
         <rect x="2" y="2" width="9" height="9" rx="2" /><rect x="14" y="4" width="32" height="5" rx="1.5" />
         <rect x="2" y="14" width="9" height="9" rx="2" /><rect x="14" y="16" width="32" height="5" rx="1.5" />
@@ -379,29 +461,45 @@ const PREVIEW_ITEMS: { title: Key; summary: Key; source: string; hue: number }[]
   { title: 'settings.previewTitle4', summary: 'settings.previewSummary4', source: 'GSMArena', hue: 3 },
 ]
 
+// The strip shows exactly the first row of stories (the lead alone in the magazine, two rows of the compact
+// list): its height follows that row, so a card is never cut and no sliver of the next row shows under it.
+const PREVIEW_LAST: Record<string, number> = { grid: 0, magazine: 0, bysource: 0, list: 1 }
+
 function Preview({ t, layout, showSummary }: { t: T; layout: Layout; showSummary: boolean }) {
   const frame = useRef<HTMLDivElement>(null)
+  const inner = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
+  const [height, setHeight] = useState<number | undefined>(undefined)
   useEffect(() => {
-    const el = frame.current
-    if (!el) return
-    const fit = () => setZoom(Math.min(1, el.clientWidth / PREVIEW_WIDTH))
+    const el = frame.current, page = inner.current
+    if (!el || !page) return
+    const fit = () => {
+      const z = Math.min(1, el.clientWidth / PREVIEW_WIDTH)
+      setZoom(z)
+      const cards = page.querySelectorAll<HTMLElement>('.article')
+      const last = cards[PREVIEW_LAST[page.className.split(' ')[0]] ?? 0]
+      if (last) setHeight(Math.ceil((last.offsetTop + last.offsetHeight + 4) * z))
+    }
     fit()
     const ro = new ResizeObserver(fit)
-    ro.observe(el)
+    ro.observe(el); ro.observe(page)
     return () => ro.disconnect()
-  }, [])
-  const cls = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : 'grid'
+  }, [layout, showSummary])
+  const cls = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : layout === 'bysource' ? 'bysource' : 'grid'
   const src = (item: typeof PREVIEW_ITEMS[number]) => <div className="article-src"><b>{item.source}</b><span>·</span><span>{t('time.now')}</span></div>
   const actions = (i: number) => (
     <div className="article-actions">
       <span className="icon-btn"><BookIcon /></span>
-      <span className="icon-btn" aria-pressed={i === 0 ? 'true' : undefined}><StarIcon filled={i === 0} /></span>
+      <span className="icon-btn"><StarIcon filled={i === 0} /></span>
     </div>
   )
   return (
-    <div className="preview-frame" ref={frame}>
-      <div className={`${cls} preview`} style={zoom < 1 ? { width: PREVIEW_WIDTH, zoom } : undefined}>
+    <div className="preview-frame" ref={frame} style={{ height }} aria-hidden="true">
+      <div className={`${cls} preview`} ref={inner} style={zoom < 1 ? { width: PREVIEW_WIDTH, zoom } : undefined}>
+        {layout === 'bysource' && (
+          <div className="src-row-head"><h2>{PREVIEW_ITEMS[0].source}</h2><div className="src-arrows"><span className="icon-btn" style={{ opacity: .3 }}><BackIcon /></span><span className="icon-btn flip"><BackIcon /></span></div></div>
+        )}
+        <div className={layout === 'bysource' ? 'src-strip' : 'contents'}>
         {PREVIEW_ITEMS.map((item, i) => (
           <article key={item.title} className={`card article${layout === 'magazine' && i === 0 ? ' lead' : ''}`}>
             {layout === 'list'
@@ -414,6 +512,7 @@ function Preview({ t, layout, showSummary }: { t: T; layout: Layout; showSummary
             </div>
           </article>
         ))}
+        </div>
       </div>
     </div>
   )
@@ -487,9 +586,9 @@ function Links({ t, userId }: { t: T; userId: string }) {
             <div className="src-card" key={l.id}>
               <img className="src-icon" src={faviconFor(l.url)} alt="" width={28} height={28} />
               <div className="grow"><b>{l.title}</b><small>{hostname(l.url)}</small></div>
-              <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(l.id, -1)}>↑</button>
-              <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === links.length - 1} onClick={() => move(l.id, 1)}>↓</button>
-              <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(l.id)}>✕</button>
+              <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(l.id, -1)}><ArrowUpIcon /></button>
+              <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === links.length - 1} onClick={() => move(l.id, 1)}><ArrowDownIcon /></button>
+              <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(l.id)}><CloseIcon /></button>
             </div>
           ))}
         </div>
@@ -617,7 +716,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
           <div className="src-card clickable" key={m.id} data-on={m.enabled} onClick={() => toggleCustom(m)}>
             <img className="src-icon" src={faviconFor(m.url!)} alt="" width={28} height={28} loading="lazy" />
             <div className="grow"><b>{m.name || hostname(m.url!)}</b><small title={m.url!}>{hostname(m.url!)}</small></div>
-            <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={(e) => { e.stopPropagation(); remove(m) }}>✕</button>
+            <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={(e) => { e.stopPropagation(); remove(m) }}><CloseIcon /></button>
             <button type="button" role="switch" className="switch" aria-checked={m.enabled} aria-label={m.name || m.url!} onClick={(e) => { e.stopPropagation(); toggleCustom(m) }} />
           </div>
         ))}
@@ -672,7 +771,7 @@ function Weather({ t, profile, update }: { t: T; profile: Profile; update: Props
           </span>
           <div className="pref-value">
             <button type="button" className="icon-btn" aria-label={t('settings.weatherClear')} title={t('settings.weatherClear')}
-              onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}>✕</button>
+              onClick={() => update({ weather_city: null, weather_lat: null, weather_lon: null })}><CloseIcon /></button>
           </div>
         </div>
       )}
@@ -732,7 +831,7 @@ function SportTeams({ t, teams, onChange }: { t: T; teams: Team[]; onChange: (te
           </span>
           <div className="pref-value">
             <button type="button" className="icon-btn" aria-label={t('settings.sportRemove')} title={t('settings.sportRemove')}
-              onClick={() => onChange(teams.filter((x) => x.id !== team.id))}>✕</button>
+              onClick={() => onChange(teams.filter((x) => x.id !== team.id))}><CloseIcon /></button>
           </div>
         </div>
       ))}
@@ -780,12 +879,14 @@ function PasswordRow({ t, email, hasPassword, onSet }: { t: T; email: string; ha
   return (
     <div className="pref-row">
       <span className="pref-label">{t('account.password')}</span>
-      <div className="pref-value">
-        {/* a status, not a control: a flat grey pill with no border, unlike the button beside it */}
-        {saved ? <span className="muted">{t('account.passwordSaved')}</span>
-          : <span className="status-pill pair">{hasPassword ? t('account.passwordIsSet') : t('account.passwordNotSet')}</span>}
-        {!open && <button type="button" className="btn pair" onClick={() => { setOpen(true); setSaved(false) }}>{hasPassword ? t('account.change') : t('account.set')}</button>}
-      </div>
+      {/* closed: the state (a flat grey pill, not a control) and the button; open: only the form under the name */}
+      {!open && (
+        <div className="pref-value">
+          {saved ? <span className="muted">{t('account.passwordSaved')}</span>
+            : <span className="status-pill pair">{hasPassword ? t('account.passwordIsSet') : t('account.passwordNotSet')}</span>}
+          <button type="button" className="btn pair" onClick={() => { setOpen(true); setSaved(false) }}>{hasPassword ? t('account.change') : t('account.set')}</button>
+        </div>
+      )}
       {open && (
         <PasswordForm t={t} email={email} hasPassword={hasPassword}
           onSet={onSet} onDone={() => { setOpen(false); setSaved(true) }} onCancel={() => setOpen(false)} />
@@ -806,6 +907,8 @@ function PasswordForm({ t, email, hasPassword, onSet, onDone, onCancel }: { t: T
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    // the length rule shows only when it is broken, not as a standing hint
+    if (pw.length < 8) { setMsg({ ok: false, text: t('account.passwordShort') }); return }
     if (pw !== pw2) { setMsg({ ok: false, text: t('account.passwordMismatch') }); return }
     setBusy(true); setMsg(null)
     if (needCurrent) {
@@ -848,12 +951,11 @@ function PasswordForm({ t, email, hasPassword, onSet, onDone, onCancel }: { t: T
       )}
       <label className="field">
         <span>{t('account.newPassword')}</span>
-        <input className="input" type="password" autoComplete="new-password" minLength={8} required aria-describedby="pw-rule" value={pw} onChange={(e) => setPw(e.target.value)} />
-        <small id="pw-rule" className="muted">{t('account.passwordRule')}</small>
+        <input className="input" type="password" autoComplete="new-password" required value={pw} onChange={(e) => setPw(e.target.value)} />
       </label>
       <label className="field">
         <span>{t('account.confirmPassword')}</span>
-        <input className="input" type="password" autoComplete="new-password" minLength={8} required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        <input className="input" type="password" autoComplete="new-password" required value={pw2} onChange={(e) => setPw2(e.target.value)} />
       </label>
       {msg && <div className={`msg ${msg.ok ? '' : 'error'}`} role="status">{msg.text}</div>}
       <div className="row">
@@ -926,7 +1028,7 @@ function Invites({ t, lang, selfId }: { t: T; lang: Profile['language']; selfId:
                 </div>
                 <span className="lang-badge">{a.is_admin ? t('invites.admin') : t(`invites.status.${a.status}` as Key)}</span>
                 {!a.is_admin && a.id !== selfId && (
-                  <button type="button" className="icon-btn" aria-label={t('invites.remove')} title={t('invites.remove')} onClick={() => remove(a)}>✕</button>
+                  <button type="button" className="icon-btn" aria-label={t('invites.remove')} title={t('invites.remove')} onClick={() => remove(a)}><CloseIcon /></button>
                 )}
               </div>
             ))}

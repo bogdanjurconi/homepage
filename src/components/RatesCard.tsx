@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CaretUpIcon, CaretDownIcon, MinusIcon } from './Icons'
 import { supabase } from '../lib/supabase'
 import type { T } from '../lib/i18n'
 import type { Language, Rates } from '../lib/types'
@@ -42,7 +43,7 @@ export default function RatesCard({ lang, t, codes }: { lang: Language; t: T; co
               <b>{fmt.format(r.value)}</b>
               {r.change != null && (
                 <small className={`rates-chg ${r.change > 0 ? 'up' : r.change < 0 ? 'down' : ''}`}>
-                  {r.change > 0 ? '▲' : r.change < 0 ? '▼' : '='} {fmtChange.format(r.change)}
+                  {r.change > 0 ? <CaretUpIcon /> : r.change < 0 ? <CaretDownIcon /> : <MinusIcon />}{fmtChange.format(r.change)}
                 </small>
               )}
             </span>

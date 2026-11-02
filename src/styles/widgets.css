@@ -1,80 +1,79 @@
 /* Front-page widgets: search, quick links, rates, calendar, weather. */
 /* ---------- widgets ---------- */
-.widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-bottom: 16px; }
+.widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
 /* ---------- widgets row 2 ---------- */
-.search { display: flex; align-items: center; gap: 8px; margin: 14px 0 16px; padding: 6px 6px 6px 16px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); }
+.search { display: flex; align-items: center; gap: 8px; margin: 16px 0; padding: 6px 6px 6px 16px; border-radius: 999px; background: var(--card); box-shadow: var(--shadow); }
 .search:focus-within { box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft); }
 .search-icon { width: 1.3em; height: 1.3em; color: var(--muted); flex: 0 0 auto; }
 .search-input { flex: 1; min-width: 0; min-height: var(--tap); border: 0; background: transparent; font-size: 1.05em; }
 .search-input:focus { outline: none; }
 .search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.75em, 1fr)); gap: 8px; margin-bottom: 16px; }
-.tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); text-decoration: none; min-height: 84px; }
+.tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px 8px; border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); text-decoration: none; min-height: 84px; }
 @media (hover: hover) { .tile:hover { background: var(--hover); } }
 .tile-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-md); background: var(--chip); font-weight: 700; font-size: 1.2em; color: var(--accent); overflow: hidden; }
 .tile-icon img { width: 28px; height: 28px; }
 .tile-label { font-size: .85em; font-weight: 600; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (min-width: 720px) { .tiles { grid-template-columns: repeat(auto-fill, 112px); gap: 10px; } }
-.rates, .calendar { padding: 16px 20px; }
-.rates-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+@media (min-width: 720px) { .tiles { grid-template-columns: repeat(auto-fill, 112px); gap: 12px; } }
+.rates, .calendar { padding: 16px; }
+.rates-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .rates-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.rates-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; }
+.rates-list li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-variant-numeric: tabular-nums; }
 .rates-list small { color: var(--muted); font-weight: 400; }
-.calendar { display: grid; gap: 10px; }
+.calendar { display: grid; gap: 12px; }
 .calendar ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-.cal-names { font-size: .9em; }
+.cal-names { font-size: .92em; }
 .calendar > div > small { display: block; margin-bottom: 8px; font-weight: 700; font-size: 1em; color: var(--fg); }
 .badge { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: .78em; font-weight: 700; vertical-align: middle; }
 /* ---------- rates v2 ---------- */
 .rates-code { white-space: nowrap; }
-.rates-val { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
-.rates-chg { font-size: .8em; color: var(--muted); font-weight: 600; }
+.rates-val { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.rates-chg { display: inline-flex; align-items: center; gap: 2px; font-size: .85em; color: var(--muted); font-weight: 600; }
+.rates-chg svg { width: .8em; height: .8em; }
 .rates-chg.up { color: #b45309; }
 .rates-chg.down { color: #15803d; }
 :root[data-theme="dark"] .rates-chg.up { color: #fbbf24; }
 :root[data-theme="dark"] .rates-chg.down { color: #4ade80; }
 /* ---------- sport: classic left-right scoreboard, crest above each name ---------- */
-.sport { padding: 16px 20px; display: grid; gap: 10px; align-content: start; }
+.sport { padding: 16px; display: grid; gap: 12px; align-content: start; }
 .sport-note { margin: 0; }
 .sport-list { list-style: none; margin: 0; padding: 0; display: grid; }
-.match { display: grid; gap: 6px; padding: 10px 0; }
+.match { display: grid; gap: 8px; padding: 12px 0; }
 .match + .match { border-top: 1px solid var(--line); }
 .match:first-child { padding-top: 2px; }
-.match-meta { color: var(--muted); font-size: .82em; text-align: center; }
+.match-meta { color: var(--muted); font-size: .85em; text-align: center; }
 .match-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 8px; }
 .match-row-single { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .match-side { display: grid; justify-items: center; gap: 4px; text-align: center; min-width: 0; }
-.match-row-single .match-side { grid-auto-flow: column; justify-content: start; gap: 10px; }
+.match-row-single .match-side { grid-auto-flow: column; justify-content: start; gap: 8px; }
 .match-name { font-size: .92em; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; max-width: 100%; }
 .match-side.followed .match-name { font-weight: 700; }
 .match-mid { display: grid; justify-items: center; align-content: center; min-height: 34px; padding-top: 4px; white-space: nowrap; }
 .match-mid b { font-size: 1.3em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.match-mid small { color: var(--muted); font-size: .8em; }
+.match-mid small { color: var(--muted); font-size: .85em; }
 .sport-crest { width: 34px; height: 34px; object-fit: contain; }
 .sport-live, .match-mid .sport-live { color: var(--accent); font-weight: 800; }
 /* ---------- weather (follows the theme) ---------- */
-.weather { display: grid; gap: 12px; padding: 18px 20px 14px; }
+.weather { display: grid; gap: 12px; padding: 16px; }
 .weather-empty { min-height: 120px; }
-.w-now { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 4px 14px; }
+.w-now { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: center; gap: 4px 16px; }
 .w-icon { width: 56px; height: 56px; stroke-width: 1.4; color: var(--accent); }
 .w-temp { font-size: 3.2em; font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .w-temp span { font-size: .55em; font-weight: 600; vertical-align: top; margin-left: 2px; color: var(--muted); }
 .w-text { display: grid; gap: 4px; min-width: 0; }
 .w-cond { font-weight: 700; font-size: 1.05em; line-height: 1.2; }
 .w-sub { color: var(--muted); font-size: .92em; }
-.w-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.w-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
 .w-chips span { padding: 2px 8px; border-radius: 999px; background: var(--chip); font-size: .78em; font-weight: 700; white-space: nowrap; }
-.w-days { list-style: none; margin: 0; padding: 10px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; border-top: 1px solid var(--line); text-align: center; }
+.w-days { list-style: none; margin: 0; padding: 12px 0 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; border-top: 1px solid var(--line); text-align: center; }
 .w-days li { display: grid; justify-items: center; align-content: start; gap: 1px; line-height: 1.25; }
-.w-days small { color: var(--muted); font-size: .8em; }
+.w-days small { color: var(--muted); font-size: .85em; }
 .w-days b { font-size: 1.05em; }
 .w-day-icon { width: 28px; height: 28px; margin: 3px 0; color: var(--accent); }
 .w-days .w-rain { color: var(--accent); font-weight: 700; }
 .hero .weather { flex: 1 1 400px; max-width: 580px; }
 @media (max-width: 719px) {
   .hero .weather { max-width: none; }
-  .weather { padding: 16px 16px 12px; }
-  .rates, .calendar, .sport { padding: 14px 16px; }
 }
 @media (max-width: 420px) {
   .w-now { grid-template-columns: auto minmax(0, 1fr); }

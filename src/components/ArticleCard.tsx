@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { T } from '../lib/i18n'
 import type { FeedItem, Language } from '../lib/types'
 import { timeAgo } from '../lib/time'
@@ -18,14 +18,16 @@ type Props = {
   className?: string
   // Compact list: on a phone, source, time and buttons sit on the picture, so the row is only picture and headline.
   compact?: boolean
+  // the first cards on screen: not lazy, so the largest picture is not deprioritised by the browser
+  eager?: boolean
 }
 
-export default function ArticleCard({ item, sourceName, lang, t, saved, onToggleSave, showImage, openInReader, showSummary, className, compact }: Props) {
+function ArticleCard({ item, sourceName, lang, t, saved, onToggleSave, showImage, openInReader, showSummary, className, compact, eager }: Props) {
   const [imgOk, setImgOk] = useState(true)
   const readerHref = hrefFor('read', item.id)
   const hasImage = showImage && !!item.image_url && imgOk
   const img = hasImage && (
-    <img className="article-img" src={item.image_url!} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
+    <img className="article-img" src={item.image_url!} alt="" loading={eager ? 'eager' : 'lazy'} fetchPriority={eager ? 'high' : undefined} decoding="async" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
   )
   const src = (
     <div className="article-src">
@@ -59,3 +61,6 @@ export default function ArticleCard({ item, sourceName, lang, t, saved, onToggle
     </article>
   )
 }
+
+// Cards re-render only when their own story, saved state or settings change, not on every filter keystroke.
+export default memo(ArticleCard)

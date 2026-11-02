@@ -1,21 +1,20 @@
 /* Settings and Login pages. */
 /* ---------- login ---------- */
-.login { max-width: 460px; margin: max(10vh, 50vh - 320px) auto 24px; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; }
+.login { max-width: 460px; margin: max(10vh, 50vh - 320px) auto 24px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
 .login .brand-mark { width: 44px; height: 44px; font-size: 1.1em; }
 .login h1 { margin: 4px 0 0; }
 .login p { margin: 0; text-wrap: pretty; }
-.login p.muted { font-size: .95em; }
 .login-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 /* ---------- settings ---------- */
-.section { padding: 22px 24px; display: grid; gap: 14px; }
+.section { padding: 24px; display: grid; gap: 16px; }
 /* room between a setting's name and its pills, swatches or field, so the name reads as the heading of the choices */
-.field { display: grid; gap: 10px; }
+.field { display: grid; gap: 8px; }
 .field > span { font-weight: 600; }
 .seg { display: flex; flex-wrap: wrap; gap: 8px; }
 .seg button { min-height: var(--tap); padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-weight: 600; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
 @media (hover: hover) { .seg button:not([aria-pressed="true"]):hover { background: var(--hover); } }
-.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
 .swatch { width: var(--tap); height: var(--tap); border-radius: 50%; border: 3px solid transparent; padding: 0; }
 .swatch[aria-pressed="true"] { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
 /* the picker swatch: a colour wheel, with the picked colour in its middle once there is one */
@@ -25,34 +24,21 @@
 .swatch.custom.on { border-color: var(--card); box-shadow: 0 0 0 2px var(--fg); }
 /* a ring for keyboard focus only: after the picker closes the input keeps focus, and the selection ring is enough */
 .swatch.custom:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
-/* swatch colours mirror the accent tokens in base.css: light first, then the dark overrides */
+/* swatch colours mirror the light accent tokens in base.css (the same swatch on both themes) */
 .swatch[data-accent="blue"] { background: #24518f; }
 .swatch[data-accent="teal"] { background: #1b6873; }
 .swatch[data-accent="green"] { background: #2e6a45; }
 .swatch[data-accent="amber"] { background: #87601a; }
 .swatch[data-accent="coral"] { background: #8c2c3c; }
 .swatch[data-accent="violet"] { background: #6b3f7d; }
-:root[data-theme="dark"] .swatch[data-accent="blue"] { background: #24518f; }
-:root[data-theme="dark"] .swatch[data-accent="teal"] { background: #1b6873; }
-:root[data-theme="dark"] .swatch[data-accent="green"] { background: #2e6a45; }
-:root[data-theme="dark"] .swatch[data-accent="amber"] { background: #87601a; }
-:root[data-theme="dark"] .swatch[data-accent="coral"] { background: #8c2c3c; }
-:root[data-theme="dark"] .swatch[data-accent="violet"] { background: #6b3f7d; }
-/* the whole row toggles; a divider only between consecutive rows (-14px cancels the .section/.stack gap, keep in step) */
-.toggle-row { display: flex; align-items: center; gap: 12px; min-height: var(--tap); padding: 0; cursor: pointer; }
-/* every switch row after the first gets a divider with room above it, also when a field sits in between */
-.section > .toggle-row ~ .toggle-row { border-top: 1px solid var(--line); padding-top: 12px; }
-.toggle-row .grow { flex: 1; min-width: 0; }
-.toggle-row[aria-disabled="true"] { cursor: default; opacity: .5; }
-.toggle-row small { display: block; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch { position: relative; width: 52px; height: 32px; flex: 0 0 auto; border-radius: 999px; border: 0; background: var(--switch-off, var(--chip)); transition: background .15s; }
 .switch::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .3); transition: transform .15s; }
 .switch[aria-checked="true"] { background: var(--accent); }
 .switch[aria-checked="true"]::after { transform: translateX(20px); }
-.results { display: grid; gap: 6px; }
+.results { display: grid; gap: 8px; }
 .results button { text-align: left; min-height: var(--tap); padding: 8px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); }
 @media (hover: hover) { .results button:hover { background: var(--hover); } }
-.status { font-size: .9em; color: var(--muted); min-height: 1.4em; }
+.status { font-size: .92em; color: var(--muted); min-height: 1.4em; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* ---------- settings v2 ---------- */
 .settings-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
@@ -60,26 +46,24 @@
 .settings-nav::-webkit-scrollbar { display: none; }
 .settings-nav button { flex: 0 0 auto; text-align: left; min-height: var(--tap); padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--card); color: var(--muted); font-weight: 600; white-space: nowrap; }
 .settings-nav button[aria-current="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
-/* phones: edge-to-edge strip, so a cut chip reads as "more to scroll" and focus rings have room */
-@media (max-width: 719px) { .settings-nav { margin: 0 -16px; padding: 4px 16px 8px; scroll-padding-inline: 16px; } }
 /* tablets: two rows instead of a hidden overflow */
 @media (min-width: 720px) and (max-width: 899px) { .settings-nav { flex-wrap: wrap; overflow: visible; } }
 @media (min-width: 900px) {
   .settings-layout { grid-template-columns: 220px minmax(0, 1fr); gap: 24px; max-width: 924px; margin: 0 auto; align-items: start; }
-  .settings-nav { position: sticky; top: 76px; flex-direction: column; gap: 2px; padding: 6px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
+  .settings-nav { position: sticky; top: calc(var(--header) + 16px); flex-direction: column; gap: 2px; padding: 6px; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); }
   .settings-nav button { border: 0; background: transparent; }
-  .settings-nav button:hover { background: var(--hover); color: var(--fg); }
+  @media (hover: hover) { .settings-nav button:hover { background: var(--hover); color: var(--fg); } }
   .settings-nav button[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
 }
 /* a settings column the width of a phone-settings page or a Mac preferences window: rows stay readable left to right */
 .settings-main { display: grid; gap: 16px; min-width: 0; max-width: 680px; }
-.settings-main .section { scroll-margin-top: 76px; }
+.settings-main .section { scroll-margin-top: calc(var(--header) + 16px); }
 .settings-main .filter-row { margin-bottom: 0; }
 .src-count { margin-left: auto; }
 /* a little more room under the title and description than between the settings themselves, so the head reads as one block */
 .section-head { display: grid; gap: 2px; margin-bottom: 8px; }
 .section-head p { margin: 0; }
-.stack { display: grid; gap: 14px; align-content: start; }
+.stack { display: grid; gap: 16px; align-content: start; }
 .two-col { display: grid; gap: 16px; }
 @media (min-width: 720px) { .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; } }
 /* account: sign-out is a footer action, bottom-right beside "Save password"; on phones a hairline separates it from the form */
@@ -114,6 +98,8 @@
 .pref-rows .pref-value .seg.seg-small { flex-wrap: wrap; justify-content: flex-end; }
 /* the choices of the row above: a quieter name, no line between them and their switch */
 .pref-sub { border-top: 0; padding-top: 0; }
+/* a little air between a switch and the choices it opens (currencies, search engine) */
+.pref-sub.pref-fill { padding-top: 4px; }
 .pref-sub .pref-label { font-weight: 400; color: var(--muted); }
 .pref-email { display: block; font-weight: 400; overflow-wrap: anywhere; color: var(--muted); }
 /* a team row: crest and name as the row's name */
@@ -129,6 +115,8 @@
   .pref-under .pref-label, .pref-under .pref-value { grid-column: 2; grid-row: 1; }
   .pref-under .pref-label { justify-self: start; }
   .pref-under .pref-value { justify-self: end; }
+  /* pills in a sub-row are as wide as one of the three cards or pills above and below them */
+  .pref-rows .pref-under .pref-value .seg:not(.seg-small) button { width: calc((390px - 16px) / 3); }
 }
 @media (max-width: 719px) {
   .pref-row { display: flex; flex-wrap: wrap; justify-content: space-between; }
@@ -143,20 +131,22 @@
   .pref-row > .password-form, .pref-note { flex: 0 0 100%; }
 }
 /* a password form reads best as one narrow column: labels above fields, one button at the end */
-.password-form { display: grid; gap: 14px; }
+.password-form { display: grid; gap: 16px; }
 .password-form .hint { font-size: .92em; }
 .password-form small { font-size: .85em; }
 .field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .field-head > label { font-weight: 600; }
 /* a quiet text action, like "Forgot your password?" next to a field label */
-.link-btn { border: 0; background: none; padding: 4px 0; color: var(--accent); font: inherit; font-size: .9em; font-weight: 600; cursor: pointer; }
-.link-btn:hover { text-decoration: underline; }
+.link-btn { border: 0; background: none; padding: 4px 0; color: var(--accent); font: inherit; font-size: .92em; font-weight: 600; cursor: pointer; }
+@media (hover: hover) { .link-btn:hover { text-decoration: underline; } }
 .link-btn:disabled { opacity: .5; cursor: default; }
 
 /* the preview stays in view (under the header) while the Appearance rows scroll under it, so every change
    shows at once; it is a short strip, the first row of stories */
-.look-preview { display: grid; gap: 8px; align-content: start; margin-bottom: 6px; position: sticky; top: 62px; z-index: 2; background: var(--card); padding: 10px 0 12px; border-bottom: 1px solid var(--line); }
-.look-preview .preview-frame { max-height: 190px; }
+.look-preview { display: grid; gap: 8px; align-content: start; margin-bottom: 6px; position: sticky; top: calc(var(--header) + 2px); z-index: 2; background: var(--card); padding: 8px 0 12px; }
+/* shorter pictures in the strip, so the headline and a line of summary show under them whatever the layout;
+   the frame's height is set by the Preview component to its first row of stories */
+.look-preview .preview-img { aspect-ratio: 5 / 2; }
 /* a sticky band stops at its section's padding: move 10px of the Appearance card's bottom padding inside,
    so the band can travel those 10px further down before it leaves */
 .settings-main #look { padding-bottom: 12px; }
@@ -169,16 +159,20 @@
 .magazine.preview .article:nth-child(n+4) { display: none; }
 /* the page's magazine allows three columns from 340px; the 640px preview keeps its two, as before */
 .look-preview .magazine { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* by-source preview: one row, its cards narrow enough for three to show */
+.look-preview .bysource .src-strip > .article { flex-basis: 300px; }
+.look-preview .src-row-head { margin-bottom: 6px; }
 /* the magazine lead keeps the front page's look (half picture, half text), so it fits the short strip */
 .preview-img[data-hue="1"] { filter: hue-rotate(45deg); }
 .preview-img[data-hue="2"] { filter: hue-rotate(-40deg) saturate(.8); }
 .preview-img[data-hue="3"] { filter: hue-rotate(90deg) saturate(.7); }
-@media (min-width: 720px) {
-}
 .preview-img { aspect-ratio: 16 / 9; background: var(--accent-soft); }
 @supports (color: color-mix(in srgb, red, blue)) { .preview-img { background: linear-gradient(135deg, var(--accent-soft), color-mix(in srgb, var(--accent) 55%, var(--card))); } }
 
 .option-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.option-cards.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.option-cards.four .option-card { padding-inline: 4px; }
+@media (max-width: 719px) { .option-cards.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .option-card { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 84px; padding: 12px 8px; border: 2px solid var(--line); border-radius: var(--radius-md); background: var(--card); font-weight: 600; font-size: .92em; text-align: center; }
 @media (hover: hover) { .option-card:hover { background: var(--hover); } }
 .option-card[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -199,8 +193,8 @@
   .option-card { padding: 10px 4px; font-size: .85em; }
 }
 
-.src-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 10px; }
-.src-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 12px 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); transition: border-color .15s; }
+.src-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.src-card { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px 8px 16px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--card); transition: border-color .15s; }
 .src-card[data-on="true"] { border-color: var(--accent); background: var(--accent-soft); }
 @supports (color: color-mix(in srgb, red, blue)) { .src-card[data-on="true"] { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent-soft) 40%, var(--card)); } }
 .src-card.clickable { cursor: pointer; }
@@ -210,8 +204,8 @@
 .src-icon { width: 28px; height: 28px; padding: 3px; border-radius: 8px; flex: 0 0 auto; display: grid; place-items: center; background: var(--chip); }
 .src-card svg.src-icon { color: var(--accent); }
 .team-crest { width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
-.lang-badge { flex: 0 0 auto; font-size: .78em; font-weight: 800; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
-.seg-small button { min-height: 40px; padding: 0 12px; font-size: .9em; }
+.lang-badge { flex: 0 0 auto; font-size: .78em; font-weight: 700; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+.seg-small button { min-height: var(--tap); padding: 0 12px; font-size: .92em; }
 .add-source .row { align-items: stretch; }
 /* quick link form: address and name side by side with the button; on a phone the address takes its own line */
 .add-link .row { flex-wrap: wrap; }
@@ -228,10 +222,38 @@
 }
 /* phones: the settings list (one row per section, a chevron to its page) and the way back from a page */
 .settings-list { display: grid; padding: 4px 0; }
-.settings-list a { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 18px; text-decoration: none; color: var(--fg); }
+.settings-list a { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px 16px; text-decoration: none; color: var(--fg); }
 .settings-list a + a { border-top: 1px solid var(--line); }
 .settings-list .grow { flex: 1; min-width: 0; }
-.settings-list small { display: block; color: var(--muted); font-size: .88em; margin-top: 2px; }
+.settings-list small { display: block; color: var(--muted); font-size: .92em; margin-top: 2px; }
 .settings-list .chevron { width: 1.1em; height: 1.1em; flex: 0 0 auto; color: var(--muted); transform: rotate(180deg); }
 .settings-back { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); margin-left: -8px; padding: 0 8px; color: var(--accent); font-weight: 700; font-size: 1.05em; text-decoration: none; }
 .settings-back svg { width: 1.2em; height: 1.2em; }
+/* the person's own source order: a short numbered list in the control column, up and down on each line */
+.order-list ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; counter-reset: src; }
+.order-list li { display: flex; align-items: center; gap: 4px; padding-left: 4px; border-radius: var(--radius-sm); counter-increment: src; }
+.order-list li::before { content: counter(src) "."; width: 1.6em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.order-list li:nth-child(odd) { background: var(--chip); }
+.order-list .grow { flex: 1; min-width: 0; }
+.order-list .icon-btn:disabled { opacity: .3; }
+/* the order row's head: its name, and the two pills at the right end */
+.pref-full-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pref-full-head .seg { flex-wrap: nowrap; }
+.pref-rows .pref-full-head .seg button { width: calc((390px - 16px) / 3); flex: 0 0 auto; padding: 0 10px; }
+/* the distribution slider: a row of its own, the bar across the whole card, its three stops named above it */
+.pref-full { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.range-block { display: grid; gap: 2px; }
+.range-marks { position: relative; display: flex; justify-content: space-between; font-size: .92em; color: var(--muted); padding: 0 2px; }
+.range-marks span:nth-child(2) { position: absolute; left: 50%; transform: translateX(-50%); }
+.range-block input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
+@media (max-width: 719px) {
+  .pref-rows .pref-full { display: grid; grid-template-columns: minmax(0, 1fr); }
+  /* phones: the order pills share what is left of the line beside the name */
+  .pref-rows .pref-full-head .seg button { width: auto; flex: 1 1 0; min-width: 0; }
+  .pref-full-head .seg { flex: 0 1 260px; }
+}
+/* sub-row choices of the front page (currencies, search engine): one band of equal pills, 390px at the right on
+   a computer like the Appearance controls, the whole line under the name on a phone, the same for both rows */
+.pref-rows .pref-fill .pref-value > .seg { width: 390px; max-width: 100%; flex-wrap: nowrap; }
+.pref-rows .pref-fill .pref-value > .seg button { flex: 1 1 0; width: auto; min-width: 0; padding: 0 6px; }
+@media (max-width: 719px) { .pref-rows .pref-fill .pref-value > .seg { width: 100%; } }

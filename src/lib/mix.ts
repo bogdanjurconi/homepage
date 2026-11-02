@@ -12,11 +12,12 @@ const timeOf = (x: FeedItem) => Date.parse(x.published_at ?? '') || 0
 
 /**
  * Fair share between sources (weighted fair queueing). Each source gets room on the page in proportion
- * to the square root of how much it posts: a site with 16 times more stories a day gets 4 times more
- * cards, not 16. Each source's own stories stay newest first; no source shows more than MAX_RUN in a
- * row while another one has a story waiting; and nothing jumps ahead by more than MAX_PULL_MS.
+ * to (stories a day)^balance: at 0 every source gets the same room, at 0.5 (the default) a site with 16
+ * times more stories a day gets 4 times more cards, at 1 the page follows the volume, close to plain
+ * chronological order. Each source's own stories stay newest first; no source shows more than MAX_RUN
+ * in a row while another one has a story waiting; and nothing jumps ahead by more than MAX_PULL_MS.
  */
-export function mixSources(items: FeedItem[]): FeedItem[] {
+export function mixSources(items: FeedItem[], balance = 0.5): FeedItem[] {
   const queues = new Map<string, FeedItem[]>()
   for (const it of items) {
     const q = queues.get(it.feed_url) ?? []
@@ -26,7 +27,7 @@ export function mixSources(items: FeedItem[]): FeedItem[] {
   for (const q of queues.values()) q.sort((a, b) => timeOf(b) - timeOf(a))
   const now = Date.now()
   const weight = new Map<string, number>()
-  for (const [url, q] of queues) weight.set(url, Math.sqrt(Math.max(1, q.filter((x) => now - timeOf(x) <= DAY_MS).length)))
+  for (const [url, q] of queues) weight.set(url, Math.pow(Math.max(1, q.filter((x) => now - timeOf(x) <= DAY_MS).length), balance))
   const used = new Map<string, number>()
   const out: FeedItem[] = []
   let runSource = '', run = 0

@@ -1,7 +1,7 @@
 export type Language = 'ro' | 'en'
 export type Theme = 'light' | 'dark' | 'auto'
 export type TextSize = 'small' | 'normal' | 'large'
-export type Layout = 'list' | 'cards' | 'magazine'
+export type Layout = 'list' | 'cards' | 'magazine' | 'bysource'
 export type Font = 'system' | 'serif' | 'rounded'
 export type Background = 'flat' | 'tinted' | 'paper'
 export type PresetAccent = 'blue' | 'teal' | 'green' | 'amber' | 'coral' | 'violet'
@@ -10,7 +10,7 @@ export type Accent = PresetAccent | `#${string}`
 export type SearchEngine = 'google' | 'brave'
 
 export const ACCENTS: PresetAccent[] = ['blue', 'teal', 'green', 'amber', 'coral', 'violet']
-export const LAYOUTS: Layout[] = ['cards', 'magazine', 'list']
+export const LAYOUTS: Layout[] = ['cards', 'magazine', 'list', 'bysource']
 
 export const FONTS: Font[] = ['system', 'serif', 'rounded']
 export const BACKGROUNDS: Background[] = ['flat', 'tinted', 'paper']
@@ -42,6 +42,11 @@ export interface Profile {
   weather_lat: number | null
   weather_lon: number | null
   teams: Team[]
+  // "Sources" layout: row order, alphabetical or the person's own list of feed URLs
+  // cards, magazine, compact: how the page is shared between sources, 0 = equally, 4 = by volume (see lib/mix.ts)
+  mix_balance: number
+  source_sort: 'alpha' | 'custom'
+  source_order: string[]
 }
 
 export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
@@ -67,6 +72,9 @@ export const DEFAULT_PROFILE: Omit<Profile, 'id'> = {
   weather_lat: null,
   weather_lon: null,
   teams: [],
+  mix_balance: 2,
+  source_sort: 'alpha',
+  source_order: [],
 }
 
 export type Category = 'news' | 'tech' | 'sport' | 'other' | 'custom'
@@ -117,6 +125,9 @@ export interface FeedsResponse {
   sources: FeedSource[]
   items: FeedItem[]
   refreshed: number
+  // sources the server was still refreshing when it answered from its cache; ask again after retry_after_ms
+  refreshing?: string[]
+  retry_after_ms?: number
 }
 
 export interface QuickLink {
@@ -126,7 +137,7 @@ export interface QuickLink {
   sort_order: number
 }
 
-export const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HUF'] as const
+export const CURRENCIES = ['EUR', 'USD', 'GBP'] as const
 
 export interface Rate {
   code: string

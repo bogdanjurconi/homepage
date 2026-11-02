@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
     if (!cache || Date.now() - cache.at > CACHE_MS) {
-      const res = await fetch(ECB_90D_URL, { headers: { "User-Agent": "HomepageFeedReader/1.0 (+https://bogdanjurconi.github.io/homepage/)" } });
+      const res = await fetch(ECB_90D_URL, { headers: { "User-Agent": "HomepageFeedReader/1.0 (+https://bogdanjurconi.github.io/homepage/)" }, signal: AbortSignal.timeout(8_000) });
       if (!res.ok) throw new Error(`ECB HTTP ${res.status}`);
       cache = { at: Date.now(), data: parse(await res.text()) };
     }

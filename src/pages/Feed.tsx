@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Key, T } from '../lib/i18n'
 import { CATEGORY_ORDER, type Category, type FeedItem, type FeedsResponse, type Profile } from '../lib/types'
 import { timeAgo } from '../lib/time'
-import { FEED_CACHE_KEY, readFeedCache, type CachedFeed } from '../lib/feedCache'
+import { readFeedCache, writeFeedCache, type CachedFeed } from '../lib/feedCache'
 import { useSaved } from '../hooks/useSaved'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { usePaged } from '../hooks/usePaged'
 import { mixSources, pickLeads } from '../lib/mix'
-import { useMedia } from '../hooks/useMedia'
 import ArticleCard from '../components/ArticleCard'
+import SourceRow from '../components/SourceRow'
 import WeatherCard from '../components/WeatherCard'
 import RatesCard from '../components/RatesCard'
 import SportCard from '../components/SportCard'
@@ -21,54 +21,86 @@ import { RefreshIcon, SearchIcon } from '../components/Icons'
 // Diacritics-insensitive, case-insensitive match for the news filter.
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 
+const ROW_LIMIT = 15
+
+// One row per source, each newest first. Rows stay in a fixed order so they are where the reader left them:
+// alphabetical by name, or the person's own order (sources missing from it follow, alphabetically).
+function groupBySource(items: FeedItem[], limit: number, nameOf: (url: string) => string, order: string[] | null): { url: string; site: string | null; items: FeedItem[] }[] {
+  const rows = new Map<string, FeedItem[]>()
+  for (const it of items) {
+    const r = rows.get(it.feed_url)
+    if (r) { if (r.length < limit) r.push(it) } else rows.set(it.feed_url, [it])
+  }
+  const rank = (url: string) => { const i = order ? order.indexOf(url) : -1; return i < 0 ? Infinity : i }
+  return [...rows.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b) || nameOf(a).localeCompare(nameOf(b), 'ro', { sensitivity: 'base' }))
+    .map(([url, list]) => {
+      let site: string | null = null
+      try { site = new URL(list[0].link).origin } catch { /* a feed without proper links: no site link */ }
+      return { url, site, items: list }
+    })
+}
+
 export default function Feed({ t, profile, userId }: { t: T; profile: Profile; userId: string }) {
-  const [data, setData] = useState<CachedFeed | null>(readFeedCache)
+  const [data, setData] = useState<CachedFeed | null>(() => readFeedCache(userId))
   const [loading, setLoading] = useState(!data)
   const [error, setError] = useState(false)
   const [section, setSection] = useState<Category | 'all'>('all')
-  // Same breakpoint as the one-column CSS: below it the phone layout applies.
-  const phone = useMedia('(max-width: 719px)')
   const [query, setQuery] = useState('')
   const { savedIds, toggle } = useSaved(userId)
   const { links } = useQuickLinks(userId)
 
-  const load = useCallback(async (force = false) => {
+  const retryTimer = useRef(0)
+  const load = useCallback(async (force = false, attempt = 0) => {
     setLoading(true); setError(false)
     const { data: res, error: err } = await supabase.functions.invoke<FeedsResponse>('feeds', { body: { force } })
     if (err || !res) { setError(true); setLoading(false); return }
     const cached: CachedFeed = { ...res, at: new Date().toISOString() }
-    sessionStorage.setItem(FEED_CACHE_KEY, JSON.stringify(cached))
+    writeFeedCache(userId, cached)
     setData(cached); setLoading(false)
-  }, [])
+    // The server answered from its cache while it was still refreshing some sources: ask again, once or twice.
+    if (res.refreshing?.length && attempt < 2) {
+      window.clearTimeout(retryTimer.current)
+      retryTimer.current = window.setTimeout(() => void load(false, attempt + 1), res.retry_after_ms || 8_000)
+    }
+  }, [userId])
+  useEffect(() => () => window.clearTimeout(retryTimer.current), [])
 
   useEffect(() => {
-    const c = readFeedCache()
+    const c = readFeedCache(userId)
     if (!c || Date.now() - Date.parse(c.at) > 5 * 60_000) void load()
-  }, [load])
+  }, [load, userId])
 
   const sourceByUrl = useMemo(() => new Map((data?.sources ?? []).map((s) => [s.url, s])), [data])
   const sourceName = (url: string) => sourceByUrl.get(url)?.name ?? url
+  // The filter's text per story, folded once per load rather than on every keystroke.
+  const folded = useMemo(() => new Map((data?.items ?? []).map((i) => [i.id, fold(`${i.title} ${i.summary ?? ''} ${sourceByUrl.get(i.feed_url)?.name ?? ''}`)])), [data, sourceByUrl])
 
   const sections = useMemo(() => {
     const present = new Set((data?.sources ?? []).map((s) => s.category))
     return CATEGORY_ORDER.filter((c) => present.has(c))
   }, [data])
 
-  // Phones show one column, where the magazine would only be cards with a bigger title: they get the cards.
-  const layout = phone && profile.layout === 'magazine' ? 'cards' : profile.layout
-  const layoutClass = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : 'grid'
+  const layout = profile.layout
+  const layoutClass = layout === 'list' ? 'list' : layout === 'magazine' ? 'magazine' : layout === 'bysource' ? 'bysource' : 'grid'
   const { items, leads } = useMemo<{ items: FeedItem[]; leads: Set<string> }>(() => {
     let all = data?.items ?? []
     if (section !== 'all') all = all.filter((i) => sourceByUrl.get(i.feed_url)?.category === section)
     const q = fold(query.trim())
-    if (q) all = all.filter((i) => fold(`${i.title} ${i.summary ?? ''} ${sourceName(i.feed_url)}`).includes(q))
+    if (q) all = all.filter((i) => folded.get(i.id)?.includes(q))
+    // By source, each source has its own row, newest first: no mixing needed.
+    if (layout === 'bysource') return { items: all, leads: new Set<string>() }
     // A busy source may not crowd out the quiet ones; the magazine then chooses its large stories.
-    const mixed = mixSources(all)
+    const mixed = mixSources(all, profile.mix_balance / 4)
     return layout === 'magazine' ? pickLeads(mixed) : { items: mixed, leads: new Set<string>() }
-  }, [data, section, query, sourceByUrl, layout]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, section, query, sourceByUrl, folded, layout, profile.mix_balance])
   // Cards are rendered a page at a time; the rest follow as the reader scrolls. A refresh keeps the
   // depth already revealed, so a background update never pulls the list away from under the reader.
-  const { shown, hasMore, more, sentinel } = usePaged(items, `${section}|${query}`)
+  const paged = usePaged(items, `${section}|${query}`)
+  // By source there is no single list to page: every row shows its own first stories.
+  const { shown, hasMore, more, sentinel } = layout === 'bysource' ? { ...paged, shown: items, hasMore: false } : paged
+  const rows = useMemo(() => layout === 'bysource' ? groupBySource(items, ROW_LIMIT, sourceName, profile.source_sort === 'custom' ? profile.source_order : null) : [],
+    [items, layout, profile.source_sort, profile.source_order]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const failed = (data?.sources ?? []).filter((s) => s.last_error)
   const hasWeather = profile.weather_lat != null && profile.weather_lon != null
@@ -134,8 +166,16 @@ export default function Feed({ t, profile, userId }: { t: T; profile: Profile; u
       )}
 
       <div className={layoutClass}>
-        {shown.map((item) => (
-          <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t}
+        {layout === 'bysource' && rows.map((row, ri) => (
+          <SourceRow key={row.url} name={sourceName(row.url)} href={row.site} t={t}>
+            {row.items.map((item, i) => (
+              <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t} eager={ri === 0 && i < 3}
+                saved={savedIds.has(item.id)} onToggleSave={toggle} showImage openInReader={profile.open_in_reader} showSummary={profile.show_summary} />
+            ))}
+          </SourceRow>
+        ))}
+        {layout !== 'bysource' && shown.map((item, i) => (
+          <ArticleCard key={item.id} item={item} sourceName={sourceName(item.feed_url)} lang={profile.language} t={t} eager={i < 4}
             saved={savedIds.has(item.id)} onToggleSave={toggle} showImage compact={layout === 'list'} openInReader={profile.open_in_reader} showSummary={profile.show_summary}
             className={leads.has(item.id) ? 'lead' : undefined} />
         ))}

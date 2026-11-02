@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
       },
     });
     if (!res.ok) return json({ error: `HTTP ${res.status}` }, 502);
-    const html = (await res.text()).slice(0, MAX_BYTES);
+    if (!/html|xml/i.test(res.headers.get("content-type") ?? "text/html")) throw new Error("not a web page");
+    const html = await readUpTo(res, MAX_BYTES);
     const doc = new DOMParser().parseFromString(html, "text/html");
     if (!doc) return json({ error: "parse failed" }, 502);
     // Readability needs a base URI to resolve relative links and images.
@@ -82,4 +83,21 @@ function hostname(url: string): string {
 
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
+// Reads at most `max` bytes of the body: a huge page is cut short, not downloaded whole and then sliced.
+async function readUpTo(res: Response, max: number): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (size < max) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    chunks.push(value); size += value.length;
+  }
+  reader.cancel().catch(() => {});
+  const all = new Uint8Array(size); let off = 0;
+  for (const c of chunks) { all.set(c, off); off += c.length; }
+  return new TextDecoder().decode(all.subarray(0, max));
 }

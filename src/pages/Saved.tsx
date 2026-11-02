@@ -13,7 +13,7 @@ export default function Saved({ t, profile, userId }: { t: T; profile: Profile; 
   const [rows, setRows] = useState<Row[] | null>(null)
   // Friendly source names, seeded from the cached feed (the sources switched on) and completed below with the defaults
   // table and the user's own named sources, so a story from a source switched off keeps its name; the hostname is the last resort.
-  const [names, setNames] = useState(() => new Map((readFeedCache()?.sources ?? []).map((s) => [s.url, s.name])))
+  const [names, setNames] = useState(() => new Map((readFeedCache(userId)?.sources ?? []).map((s) => [s.url, s.name])))
 
   useEffect(() => {
     supabase.from('saved_articles')

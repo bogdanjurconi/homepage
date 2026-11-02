@@ -6,3 +6,6 @@ dist/
 .supabase/
 .DS_Store
 *.log
+
+# Deno writes this when type-checking the edge functions locally; the functions are deployed from source
+deno.lock

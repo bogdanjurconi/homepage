@@ -154,7 +154,7 @@ async function teamRow(admin: SupabaseClient, id: number): Promise<Side> {
 }
 
 async function api(path: string): Promise<unknown> {
-  const res = await fetch(API + path, { headers: { "X-Auth-Token": API_KEY } });
+  const res = await fetch(API + path, { headers: { "X-Auth-Token": API_KEY }, signal: AbortSignal.timeout(8_000) });
   if (res.status === 429) throw new Error("rate limited");
   if (!res.ok) throw new Error(`football-data HTTP ${res.status}`);
   return res.json();

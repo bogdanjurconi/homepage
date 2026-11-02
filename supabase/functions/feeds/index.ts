@@ -1,6 +1,7 @@
 // Edge Function "feeds"
 // Returns the signed-in user's enabled sources and their cached items.
-// Feeds older than STALE_MINUTES are re-fetched server-side first (avoids CORS in the browser).
+// Feeds older than STALE_MINUTES are re-fetched server-side, in the background: the answer comes from the
+// cache at once and the client asks again a few seconds later for what the refresh brought.
 // Writes use the service role; reads are restricted to the caller's own source list.
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { parseFeed, MediaRss } from "jsr:@mikaelporttila/rss@1";
@@ -13,7 +14,11 @@ const STALE_MINUTES = 15;
 const FETCH_TIMEOUT_MS = 10_000;
 const MAX_ITEMS_PER_FEED = 40;
 const KEEP_DAYS = 14;
-const MAX_ITEMS_RETURNED = 400;
+const MAX_ITEMS_RETURNED = 300;
+// ...and at least this many of every source, so a weekly source still has a row in the "Sources" layout
+const MIN_PER_FEED = 12;
+// How long a request waits for a refresh it cannot answer from the cache (a source never fetched, or Refresh pressed)
+const FIRST_WAIT_MS = 6_000;
 // Feeds without pictures (HotNews): take the article's og:image, a few new articles per refresh.
 const PAGE_IMAGES_PER_REFRESH = 20;
 const PAGE_TIMEOUT_MS = 5_000;
@@ -24,6 +29,9 @@ const CORS = {
 };
 
 type Source = { name: string; url: string; category: string; sort_order: number; is_custom: boolean };
+
+// Supabase's edge runtime keeps the isolate alive for promises handed to waitUntil after the response is sent.
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
@@ -39,27 +47,32 @@ Deno.serve(async (req) => {
 
   const sources = await loadSources(admin, user.id);
   const urls = sources.map((s) => s.url);
-  if (urls.length === 0) return json({ sources: [], items: [] });
+  if (urls.length === 0) return json({ sources: [], items: [], refreshed: 0, refreshing: [] });
 
+  // This request claims the stale feeds (claim_feeds marks them, so two people opening the page at once do
+  // not both refresh them) and refreshes them after answering. Only a source never fetched before, or an
+  // explicit Refresh, is waited for, and only a little, so the page is not empty.
+  const started = Date.now();
   const { data: states } = await admin.from("feeds").select("url,last_fetched_at").in("url", urls);
-  const now = Date.now();
-  const stale = sources.filter((s) => {
-    const st = states?.find((x) => x.url === s.url);
-    return force || !st?.last_fetched_at || now - Date.parse(st.last_fetched_at) > STALE_MINUTES * 60_000;
-  });
-  await Promise.all(stale.map((s) => refreshFeed(admin, s.url)));
+  const lastOf = (u: string) => states?.find((s) => s.url === u)?.last_fetched_at ?? null;
+  const { data: claimed } = await admin.rpc("claim_feeds", { urls, min_age: force ? "0 seconds" : `${STALE_MINUTES} minutes` });
+  const claimedUrls: string[] = Array.isArray(claimed) ? claimed : [];
+  const refresh = Promise.allSettled(claimedUrls.map((u) => refreshFeed(admin, u, lastOf(u))));
+  if (force || claimedUrls.some((u) => !lastOf(u))) await Promise.race([refresh, new Promise((r) => setTimeout(r, FIRST_WAIT_MS))]);
+  if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(refresh); else await refresh;
 
   const [{ data: items }, { data: finalStates }] = await Promise.all([
-    admin.from("feed_items")
-      .select("id,feed_url,title,link,summary,image_url,published_at")
-      .in("feed_url", urls)
-      .order("published_at", { ascending: false, nullsFirst: false })
-      .limit(MAX_ITEMS_RETURNED),
+    admin.rpc("feed_items_for", { urls, per_feed: MIN_PER_FEED, total: MAX_ITEMS_RETURNED }),
     admin.from("feeds").select("url,title,last_fetched_at,last_error").in("url", urls),
   ]);
 
   const out = sources.map((s) => ({ ...s, ...(finalStates?.find((x) => x.url === s.url) ?? {}) }));
-  return json({ sources: out, items: items ?? [], refreshed: stale.length });
+  // Sources still refreshing when this answer left: the client asks again shortly for the stories they bring.
+  const refreshing = claimedUrls.filter((u) => {
+    const t = finalStates?.find((x) => x.url === u)?.last_fetched_at;
+    return !t || Date.parse(t) < started;
+  });
+  return json({ sources: out, items: items ?? [], refreshed: claimedUrls.length, refreshing, retry_after_ms: refreshing.length ? 8_000 : 0 });
 });
 
 async function loadSources(admin: SupabaseClient, userId: string): Promise<Source[]> {
@@ -81,7 +94,7 @@ async function loadSources(admin: SupabaseClient, userId: string): Promise<Sourc
   return sources;
 }
 
-async function refreshFeed(admin: SupabaseClient, url: string) {
+async function refreshFeed(admin: SupabaseClient, url: string, prevFetchedAt: string | null) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   let status = 0;
@@ -103,17 +116,19 @@ async function refreshFeed(admin: SupabaseClient, url: string) {
       .map((e) => toRow(url, e as Record<string, unknown>, fetchedAt, raw))
       .filter((r): r is NonNullable<typeof r> => r !== null);
 
-    await admin.from("feeds").upsert({ url, title: feed.title?.value ?? null, last_fetched_at: fetchedAt, last_status: status, last_error: null });
+    await admin.from("feeds").upsert({ url, title: feed.title?.value ?? null, last_fetched_at: fetchedAt, last_status: status, last_error: null, refreshing_at: null });
     await fillPageImages(admin, url, rows);
     if (rows.length) {
       const { error } = await admin.from("feed_items").upsert(rows, { onConflict: "feed_url,guid" });
       if (error) throw error;
     }
-    await admin.from("feed_items").delete().eq("feed_url", url)
-      .lt("fetched_at", new Date(Date.now() - KEEP_DAYS * 86_400_000).toISOString());
+    // Retention once a day per feed; prune_feed_items keeps the stories people saved.
+    if ((prevFetchedAt ?? "").slice(0, 10) !== fetchedAt.slice(0, 10)) {
+      await admin.rpc("prune_feed_items", { feed: url, cutoff: new Date(Date.now() - KEEP_DAYS * 86_400_000).toISOString() });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await admin.from("feeds").upsert({ url, last_fetched_at: fetchedAt, last_status: status, last_error: message.slice(0, 300) });
+    await admin.from("feeds").upsert({ url, last_fetched_at: fetchedAt, last_status: status, last_error: message.slice(0, 300), refreshing_at: null });
   } finally {
     clearTimeout(timer);
   }
