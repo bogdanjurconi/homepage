@@ -29,15 +29,16 @@ export function useQuickLinks(userId: string) {
     await supabase.from('quick_links').delete().eq('id', id)
   }, [links])
 
-  const move = useCallback(async (id: string, dir: -1 | 1) => {
-    const i = links.findIndex((l) => l.id === id)
-    const j = i + dir
-    if (i < 0 || j < 0 || j >= links.length) return
-    const next = [...links]; [next[i], next[j]] = [next[j], next[i]]
+  // Moves a link from one place to another (a drag, or one step with the arrows) and saves the new order.
+  const reorder = useCallback(async (from: number, to: number) => {
+    if (from === to || from < 0 || to < 0 || from >= links.length || to >= links.length) return
+    const next = [...links]
+    const [moved] = next.splice(from, 1)
+    next.splice(to, 0, moved)
     const renumbered = next.map((l, k) => ({ ...l, sort_order: k }))
     persist(renumbered)
-    await Promise.all(renumbered.map((l) => supabase.from('quick_links').update({ sort_order: l.sort_order }).eq('id', l.id)))
+    await Promise.all(renumbered.filter((l, k) => links[k]?.id !== l.id).map((l) => supabase.from('quick_links').update({ sort_order: l.sort_order }).eq('id', l.id)))
   }, [links])
 
-  return { links, add, remove, move }
+  return { links, add, remove, reorder }
 }

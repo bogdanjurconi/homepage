@@ -49,3 +49,7 @@ export const CaretDownIcon = ({ className }: P) => (
 export const MinusIcon = ({ className }: P) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M6 12h12" /></svg>
 )
+// The handle a row is dragged by: two columns of three dots.
+export const GripIcon = ({ className }: P) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>
+)

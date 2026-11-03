@@ -9,8 +9,8 @@ import {
 import { hostname, timeAgo } from '../lib/time'
 import { useQuickLinks } from '../hooks/useQuickLinks'
 import { CURRENCIES, MAX_TEAMS, type SportTeamOption, type Team } from '../lib/types'
-import { faviconFor } from '../components/QuickLinks'
-import { StarIcon, BookIcon, BackIcon, ArrowUpIcon, ArrowDownIcon, CloseIcon } from '../components/Icons'
+import SiteIcon from '../components/SiteIcon'
+import { StarIcon, BookIcon, BackIcon, ArrowUpIcon, ArrowDownIcon, CloseIcon, GripIcon } from '../components/Icons'
 import { useMedia } from '../hooks/useMedia'
 import WeatherIcon from '../components/WeatherIcon'
 import { useForecast } from '../hooks/useForecast'
@@ -316,19 +316,19 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 // The sources on the front page, as the feeds function picks them: a default source unless switched off,
 // plus the person's own enabled ones. Read straight from the two tables (fast), not through the feeds function.
 function useEnabledSources(userId: string, active: boolean) {
-  const [sources, setSources] = useState<{ url: string; name: string }[] | null>(null)
+  const [sources, setSources] = useState<{ url: string; name: string; site?: string }[] | null>(null)
   useEffect(() => {
     if (!active || sources) return
     let cancelled = false
     void Promise.all([
-      supabase.from('default_sources').select('id,name,url,enabled_by_default'),
+      supabase.from('default_sources').select('id,name,url,site_url,enabled_by_default'),
       supabase.from('user_sources').select('default_source_id,name,url,enabled').eq('user_id', userId),
     ]).then(([{ data: defaults }, { data: mine }]) => {
       if (cancelled) return
       const own = mine ?? []
       const list = (defaults ?? [])
         .filter((d) => own.find((o) => o.default_source_id === d.id)?.enabled ?? d.enabled_by_default)
-        .map((d) => ({ url: d.url as string, name: d.name as string }))
+        .map((d): { url: string; name: string; site?: string } => ({ url: d.url as string, name: d.name as string, site: (d.site_url as string | null) ?? undefined }))
       for (const o of own) if (!o.default_source_id && o.enabled && o.url) list.push({ url: o.url, name: o.name || hostname(o.url) })
       setSources(list)
     })
@@ -337,29 +337,90 @@ function useEnabledSources(userId: string, active: boolean) {
   return sources
 }
 
-// The person's own order of source rows, each with up and down.
-function SourceOrder({ t, sources, order, onChange }: { t: T; sources: { url: string; name: string }[] | null; order: string[]; onChange: (order: string[]) => void }) {
+// One ordered list for both orderings in Settings (quick links, source rows): numbered lines with the site's
+// icon, its name and address, up and down, and remove where removing makes sense. A line can also be dragged by
+// its handle (mouse or finger): it follows the pointer and the others make room; the arrows stay for keyboards.
+type OrderItem = { key: string; url: string; name: string; sub?: string }
+function OrderList({ t, items, onReorder, onRemove }: { t: T; items: OrderItem[]; onReorder: (from: number, to: number) => void; onRemove?: (key: string) => void }) {
+  const list = useRef<HTMLOListElement>(null)
+  const [drag, setDragState] = useState<{ from: number; to: number; dy: number } | null>(null)
+  // the latest drag position also lives in a ref: a fast drag can release before React has re-rendered
+  const live = useRef<typeof drag>(null)
+  const setDrag = (d: typeof drag) => { live.current = d; setDragState(d) }
+  const start = useRef({ y: 0, tops: [] as number[], height: 0 })
+
+  const onDown = (i: number) => (e: React.PointerEvent) => {
+    const rows = [...(list.current?.children ?? [])] as HTMLElement[]
+    start.current = { y: e.clientY, tops: rows.map((r) => r.getBoundingClientRect().top), height: rows[i]?.getBoundingClientRect().height ?? 0 }
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDrag({ from: i, to: i, dy: 0 })
+  }
+  // The lifted row follows the pointer by writing its transform straight to the element, once per frame;
+  // React re-renders only when the drop place changes (the other rows then slide by CSS transition).
+  const frame = useRef(0)
+  const onMove = (e: React.PointerEvent) => {
+    const d = live.current
+    if (!d) return
+    const { y, tops, height } = start.current
+    const dy = e.clientY - y
+    const mid = tops[d.from] + height / 2 + dy
+    let to = 0
+    for (let k = 0; k < tops.length; k++) if (mid > tops[k] + height / 2) to = k
+    live.current = { ...d, to, dy }
+    if (to !== d.to) setDragState(live.current)
+    cancelAnimationFrame(frame.current)
+    frame.current = requestAnimationFrame(() => {
+      const row = list.current?.children[d.from] as HTMLElement | undefined
+      if (row && live.current) row.style.transform = `translate3d(0, ${live.current.dy}px, 0)`
+    })
+  }
+  const onUp = () => {
+    cancelAnimationFrame(frame.current)
+    const d = live.current
+    const row = d ? list.current?.children[d.from] as HTMLElement | undefined : undefined
+    if (row) row.style.transform = ''
+    if (d && d.to !== d.from) onReorder(d.from, d.to)
+    setDrag(null)
+  }
+  // while dragging, the rows between the old and the new place shift one place to make room
+  const shift = (i: number) => {
+    if (!drag || i === drag.from) return 0
+    const h = start.current.height + 2
+    if (drag.from < drag.to && i > drag.from && i <= drag.to) return -h
+    if (drag.from > drag.to && i >= drag.to && i < drag.from) return h
+    return 0
+  }
+
+  return (
+    <ol className={`order-list${drag ? ' dragging' : ''}`} ref={list}>
+      {items.map((it, i) => (
+        <li key={it.key} className={drag?.from === i ? 'lifted' : undefined}
+          style={drag && drag.from !== i ? { transform: `translate3d(0, ${shift(i)}px, 0)` } : undefined}>
+          <button type="button" className="drag-handle" aria-hidden="true" tabIndex={-1}
+            onPointerDown={onDown(i)} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => setDrag(null)}><GripIcon /></button>
+          <SiteIcon url={it.url} name={it.name} className="order-icon" />
+          <span className="grow"><b>{it.name}</b>{it.sub && <small>{it.sub}</small>}</span>
+          <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => onReorder(i, i - 1)}><ArrowUpIcon /></button>
+          <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === items.length - 1} onClick={() => onReorder(i, i + 1)}><ArrowDownIcon /></button>
+          {onRemove && <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => onRemove(it.key)}><CloseIcon /></button>}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// The person's own order of source rows.
+function SourceOrder({ t, sources, order, onChange }: { t: T; sources: { url: string; name: string; site?: string }[] | null; order: string[]; onChange: (order: string[]) => void }) {
   if (!sources) return <p className="muted pref-note">…</p>
   const rank = (url: string) => { const i = order.indexOf(url); return i < 0 ? Infinity : i }
   const list = [...sources].sort((a, b) => rank(a.url) - rank(b.url) || a.name.localeCompare(b.name, 'ro', { sensitivity: 'base' }))
-  const move = (i: number, dir: -1 | 1) => {
+  const reorder = (from: number, to: number) => {
     const urls = list.map((s) => s.url)
-    ;[urls[i], urls[i + dir]] = [urls[i + dir], urls[i]]
+    const [moved] = urls.splice(from, 1)
+    urls.splice(to, 0, moved)
     onChange(urls)
   }
-  return (
-    <div className="order-list">
-      <ol>
-        {list.map((s, i) => (
-          <li key={s.url}>
-            <span className="grow">{s.name}</span>
-            <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUpIcon /></button>
-            <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === list.length - 1} onClick={() => move(i, 1)}><ArrowDownIcon /></button>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
+  return <OrderList t={t} items={list.map((s) => ({ key: s.url, url: s.site ?? s.url, name: s.name }))} onReorder={reorder} />
 }
 
 function Segmented<V extends string>({ value, options, onChange }: { value: V; options: [V, string][]; onChange: (v: V) => void }) {
@@ -549,7 +610,7 @@ const SUGGESTED_LINKS: [string, string][] = [
 ]
 
 function Links({ t, userId }: { t: T; userId: string }) {
-  const { links, add, remove, move } = useQuickLinks(userId)
+  const { links, add, remove, reorder } = useQuickLinks(userId)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
   const [err, setErr] = useState('')
@@ -581,17 +642,8 @@ function Links({ t, userId }: { t: T; userId: string }) {
   return (
     <div className="stack">
       {links.length > 0 && (
-        <div className="src-grid">
-          {links.map((l, i) => (
-            <div className="src-card" key={l.id}>
-              <img className="src-icon" src={faviconFor(l.url)} alt="" width={28} height={28} />
-              <div className="grow"><b>{l.title}</b><small>{hostname(l.url)}</small></div>
-              <button type="button" className="icon-btn" aria-label={t('links.moveUp')} title={t('links.moveUp')} disabled={i === 0} onClick={() => move(l.id, -1)}><ArrowUpIcon /></button>
-              <button type="button" className="icon-btn" aria-label={t('links.moveDown')} title={t('links.moveDown')} disabled={i === links.length - 1} onClick={() => move(l.id, 1)}><ArrowDownIcon /></button>
-              <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={() => remove(l.id)}><CloseIcon /></button>
-            </div>
-          ))}
-        </div>
+        <OrderList t={t} items={links.map((l) => ({ key: l.id, url: l.url, name: l.title, sub: hostname(l.url) }))}
+          onReorder={reorder} onRemove={remove} />
       )}
       {suggestions.length > 0 && (
         <Field label={t('links.suggest')}>
@@ -703,7 +755,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
       <div className="src-grid">
         {shown.map((d) => (
           <div className="src-card clickable" key={d.id} data-on={isOn(d)} onClick={() => toggleDefault(d)}>
-            <img className="src-icon" src={faviconFor(d.site_url ?? d.url)} alt="" width={28} height={28} loading="lazy" />
+            <SiteIcon url={d.site_url ?? d.url} name={d.name} className="order-icon" />
             <div className="grow">
               <b>{d.name}</b>
               <small>{hostname(d.site_url ?? d.url)}</small>
@@ -714,7 +766,7 @@ function Sources({ t, userId }: { t: T; userId: string }) {
         ))}
         {showCustom && custom.map((m) => (
           <div className="src-card clickable" key={m.id} data-on={m.enabled} onClick={() => toggleCustom(m)}>
-            <img className="src-icon" src={faviconFor(m.url!)} alt="" width={28} height={28} loading="lazy" />
+            <SiteIcon url={m.url!} name={m.name || hostname(m.url!)} className="order-icon" />
             <div className="grow"><b>{m.name || hostname(m.url!)}</b><small title={m.url!}>{hostname(m.url!)}</small></div>
             <button type="button" className="icon-btn" aria-label={t('settings.remove')} title={t('settings.remove')} onClick={(e) => { e.stopPropagation(); remove(m) }}><CloseIcon /></button>
             <button type="button" role="switch" className="switch" aria-checked={m.enabled} aria-label={m.name || m.url!} onClick={(e) => { e.stopPropagation(); toggleCustom(m) }} />

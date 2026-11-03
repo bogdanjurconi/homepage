@@ -230,12 +230,25 @@
 .settings-back { display: inline-flex; align-items: center; gap: 4px; min-height: var(--tap); margin-left: -8px; padding: 0 8px; color: var(--accent); font-weight: 700; font-size: 1.05em; text-decoration: none; }
 .settings-back svg { width: 1.2em; height: 1.2em; }
 /* the person's own source order: a short numbered list in the control column, up and down on each line */
-.order-list ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; counter-reset: src; }
-.order-list li { display: flex; align-items: center; gap: 4px; padding-left: 4px; border-radius: var(--radius-sm); counter-increment: src; }
-.order-list li::before { content: counter(src) "."; width: 1.6em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.order-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; counter-reset: ord; }
+.order-list li { position: relative; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 4px 0; border-radius: var(--radius-sm); counter-increment: ord; background: var(--card); transition: transform .18s ease-out; }
+.order-list li::before { content: counter(ord) "."; order: 1; width: 1.4em; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* the handle: left of the number, grabbed with a finger or the mouse; the page does not scroll while it moves */
+.drag-handle { order: 0; display: grid; place-items: center; width: 32px; align-self: stretch; padding: 0; border: 0; background: none; color: var(--muted); cursor: grab; touch-action: none; }
+.drag-handle svg { width: 1.2em; height: 1.2em; }
+.order-list li > :not(.drag-handle) { order: 2; }
+.order-list.dragging, .order-list.dragging * { cursor: grabbing; user-select: none; }
+/* the row being moved follows the pointer above the others, the others slide out of its way */
+.order-list li.lifted { z-index: 2; transition: none; will-change: transform; box-shadow: var(--shadow), 0 6px 18px rgb(0 0 0 / .12); }
+.order-list.dragging li:not(.lifted) { will-change: transform; }
 .order-list li:nth-child(odd) { background: var(--chip); }
+.order-list li.lifted { background: var(--card); }
 .order-list .grow { flex: 1; min-width: 0; }
+.order-list b, .order-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order-list b { font-weight: 600; }
+.order-list small { color: var(--muted); font-size: .85em; }
 .order-list .icon-btn:disabled { opacity: .3; }
+.order-icon { width: 32px; height: 32px; border-radius: 8px; font-size: .95em; }
 /* the order row's head: its name, and the two pills at the right end */
 .pref-full-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pref-full-head .seg { flex-wrap: nowrap; }
